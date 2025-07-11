@@ -15,7 +15,7 @@
     "test:watch": "vitest --watch"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "^0.29.0",
+    "@coral-xyz/anchor": "^0.31.1",
     "@solana/spl-token": "^0.4.1",
     "@solana/wallet-adapter-base": "^0.9.23",
     "@solana/wallet-adapter-react": "^0.15.35",
