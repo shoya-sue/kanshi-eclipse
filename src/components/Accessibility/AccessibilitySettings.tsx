@@ -263,9 +263,9 @@ const AccessibilitySettings: React.FC<AccessibilitySettingsProps> = ({ onClose }
         {/* Action Buttons */}
         <div className="flex space-x-3 pt-6 border-t border-gray-200 dark:border-gray-700">
           <Button
-            variant="danger"
+            variant="outline"
             onClick={resetToDefaults}
-            className="flex items-center space-x-2"
+            className="flex items-center space-x-2 border-red-300 text-red-600 hover:bg-red-50 dark:border-red-600 dark:text-red-400"
           >
             <span>デフォルトに戻す</span>
           </Button>
