@@ -2,63 +2,80 @@ import { PublicKey } from '@solana/web3.js'
 import { eclipseRPCService } from './eclipseRPC'
 import { TransactionDetails, InstructionDetail, AccountInfo } from '../types/transaction'
 import { isValidTransactionSignature } from '../utils/validators'
+import { errorLogger } from './errorLogger'
+import { toastService } from './toastService'
+import { withBlockchainRetry } from '../utils/retry'
 
 export class TransactionDecoderService {
   async getTransactionDetails(signature: string): Promise<TransactionDetails | null> {
     if (!isValidTransactionSignature(signature)) {
-      throw new Error('Invalid transaction signature format')
+      const error = new Error('Invalid transaction signature format')
+      errorLogger.logError(error, {
+        category: 'TRANSACTION_DECODER',
+        context: { signature },
+        severity: 'medium'
+      })
+      throw error
     }
 
     try {
-      const transaction = await eclipseRPCService.getTransaction(signature)
-      
-      if (!transaction) {
-        return null
-      }
-
-      const instructions: InstructionDetail[] = []
-      const message = transaction.transaction.message
-      
-      // Handle both legacy and versioned transactions
-      if ('instructions' in message && message.instructions) {
-        let accountKeys: any
-        if ('accountKeys' in message) {
-          accountKeys = message.accountKeys
-        } else {
-          // For versioned transactions, we need to get account keys differently
-          accountKeys = []
-        }
+      return await withBlockchainRetry(async () => {
+        const transaction = await eclipseRPCService.getTransaction(signature)
         
-        for (const instruction of message.instructions) {
-          const programId = accountKeys[instruction.programIdIndex]
-          
-          instructions.push({
-            programId: programId?.toString() || 'Unknown',
-            accounts: instruction.accounts.map((index: number) => 
-              accountKeys[index]?.toString() || 'Unknown'
-            ),
-            data: instruction.data,
-            decodedData: await this.decodeInstructionData(instruction.data, programId),
-            instructionType: this.getInstructionType(programId),
-          })
+        if (!transaction) {
+          return null
         }
-      }
 
-      return {
-        signature,
-        slot: transaction.slot,
-        blockTime: transaction.blockTime || 0,
-        fee: transaction.meta?.fee || 0,
-        success: transaction.meta?.err === null,
-        err: transaction.meta?.err ? JSON.stringify(transaction.meta.err) : undefined,
-        accounts: 'accountKeys' in transaction.transaction.message 
-          ? transaction.transaction.message.accountKeys.map((key: any) => key.toString())
-          : [],
-        instructions,
-        logMessages: transaction.meta?.logMessages || [],
-      }
+        const instructions: InstructionDetail[] = []
+        const message = transaction.transaction.message
+        
+        // Handle both legacy and versioned transactions
+        if ('instructions' in message && message.instructions) {
+          let accountKeys: any
+          if ('accountKeys' in message) {
+            accountKeys = message.accountKeys
+          } else {
+            // For versioned transactions, we need to get account keys differently
+            accountKeys = []
+          }
+          
+          for (const instruction of message.instructions) {
+            const programId = accountKeys[instruction.programIdIndex]
+            
+            instructions.push({
+              programId: programId?.toString() || 'Unknown',
+              accounts: instruction.accounts.map((index: number) => 
+                accountKeys[index]?.toString() || 'Unknown'
+              ),
+              data: instruction.data,
+              decodedData: await this.decodeInstructionData(instruction.data, programId),
+              instructionType: this.getInstructionType(programId),
+            })
+          }
+        }
+
+        return {
+          signature,
+          slot: transaction.slot,
+          blockTime: transaction.blockTime || 0,
+          fee: transaction.meta?.fee || 0,
+          success: transaction.meta?.err === null,
+          err: transaction.meta?.err ? JSON.stringify(transaction.meta.err) : undefined,
+          accounts: 'accountKeys' in transaction.transaction.message 
+            ? transaction.transaction.message.accountKeys.map((key: any) => key.toString())
+            : [],
+          instructions,
+          logMessages: transaction.meta?.logMessages || [],
+        }
+      })
     } catch (error) {
-      console.error('Failed to get transaction details:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      errorLogger.logError(new Error(`Failed to get transaction details: ${errorMessage}`), {
+        category: 'TRANSACTION_DECODER',
+        context: { signature },
+        severity: 'high'
+      })
+      toastService.showError('Failed to fetch transaction details')
       throw error
     }
   }
@@ -76,98 +93,123 @@ export class TransactionDecoderService {
       
       return { raw: data }
     } catch (error) {
-      console.error('Failed to decode instruction data:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      errorLogger.logError(new Error(`Failed to decode instruction data: ${errorMessage}`), {
+        category: 'TRANSACTION_DECODER',
+        context: { programId: programId.toString(), data: data.substring(0, 100) },
+        severity: 'low'
+      })
       return { raw: data, error: 'Failed to decode' }
     }
   }
 
   private decodeSystemProgramInstruction(data: string): any {
-    const buffer = Buffer.from(data, 'base64')
-    if (buffer.length === 0) return { type: 'unknown' }
-    
-    const instruction = buffer.readUInt32LE(0)
-    
-    switch (instruction) {
-      case 0:
-        return { type: 'CreateAccount' }
-      case 1:
-        return { type: 'Assign' }
-      case 2:
-        return { type: 'Transfer', amount: buffer.length >= 12 ? buffer.readBigUInt64LE(4) : 0 }
-      case 3:
-        return { type: 'CreateAccountWithSeed' }
-      case 4:
-        return { type: 'AdvanceNonceAccount' }
-      case 5:
-        return { type: 'WithdrawNonceAccount' }
-      case 6:
-        return { type: 'InitializeNonceAccount' }
-      case 7:
-        return { type: 'AuthorizeNonceAccount' }
-      case 8:
-        return { type: 'Allocate' }
-      case 9:
-        return { type: 'AllocateWithSeed' }
-      case 10:
-        return { type: 'AssignWithSeed' }
-      case 11:
-        return { type: 'TransferWithSeed' }
-      default:
-        return { type: 'Unknown', instruction }
+    try {
+      const buffer = Buffer.from(data, 'base64')
+      if (buffer.length === 0) return { type: 'unknown' }
+      
+      const instruction = buffer.readUInt32LE(0)
+      
+      switch (instruction) {
+        case 0:
+          return { type: 'CreateAccount' }
+        case 1:
+          return { type: 'Assign' }
+        case 2:
+          return { type: 'Transfer', amount: buffer.length >= 12 ? buffer.readBigUInt64LE(4) : 0 }
+        case 3:
+          return { type: 'CreateAccountWithSeed' }
+        case 4:
+          return { type: 'AdvanceNonceAccount' }
+        case 5:
+          return { type: 'WithdrawNonceAccount' }
+        case 6:
+          return { type: 'InitializeNonceAccount' }
+        case 7:
+          return { type: 'AuthorizeNonceAccount' }
+        case 8:
+          return { type: 'Allocate' }
+        case 9:
+          return { type: 'AllocateWithSeed' }
+        case 10:
+          return { type: 'AssignWithSeed' }
+        case 11:
+          return { type: 'TransferWithSeed' }
+        default:
+          return { type: 'Unknown', instruction }
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      errorLogger.logError(new Error(`Failed to decode system program instruction: ${errorMessage}`), {
+        category: 'TRANSACTION_DECODER',
+        context: { data: data.substring(0, 100) },
+        severity: 'low'
+      })
+      return { type: 'Unknown', error: 'Failed to decode' }
     }
   }
 
   private decodeTokenProgramInstruction(data: string): any {
-    const buffer = Buffer.from(data, 'base64')
-    if (buffer.length === 0) return { type: 'unknown' }
-    
-    const instruction = buffer.readUInt8(0)
-    
-    switch (instruction) {
-      case 0:
-        return { type: 'InitializeMint' }
-      case 1:
-        return { type: 'InitializeAccount' }
-      case 2:
-        return { type: 'InitializeMultisig' }
-      case 3:
-        return { type: 'Transfer', amount: buffer.length >= 9 ? buffer.readBigUInt64LE(1) : 0 }
-      case 4:
-        return { type: 'Approve' }
-      case 5:
-        return { type: 'Revoke' }
-      case 6:
-        return { type: 'SetAuthority' }
-      case 7:
-        return { type: 'MintTo' }
-      case 8:
-        return { type: 'Burn' }
-      case 9:
-        return { type: 'CloseAccount' }
-      case 10:
-        return { type: 'FreezeAccount' }
-      case 11:
-        return { type: 'ThawAccount' }
-      case 12:
-        return { type: 'TransferChecked' }
-      case 13:
-        return { type: 'ApproveChecked' }
-      case 14:
-        return { type: 'MintToChecked' }
-      case 15:
-        return { type: 'BurnChecked' }
-      case 16:
-        return { type: 'InitializeAccount2' }
-      case 17:
-        return { type: 'SyncNative' }
-      case 18:
-        return { type: 'InitializeAccount3' }
-      case 19:
-        return { type: 'InitializeMultisig2' }
-      case 20:
-        return { type: 'InitializeMint2' }
-      default:
-        return { type: 'Unknown', instruction }
+    try {
+      const buffer = Buffer.from(data, 'base64')
+      if (buffer.length === 0) return { type: 'unknown' }
+      
+      const instruction = buffer.readUInt8(0)
+      
+      switch (instruction) {
+        case 0:
+          return { type: 'InitializeMint' }
+        case 1:
+          return { type: 'InitializeAccount' }
+        case 2:
+          return { type: 'InitializeMultisig' }
+        case 3:
+          return { type: 'Transfer', amount: buffer.length >= 9 ? buffer.readBigUInt64LE(1) : 0 }
+        case 4:
+          return { type: 'Approve' }
+        case 5:
+          return { type: 'Revoke' }
+        case 6:
+          return { type: 'SetAuthority' }
+        case 7:
+          return { type: 'MintTo' }
+        case 8:
+          return { type: 'Burn' }
+        case 9:
+          return { type: 'CloseAccount' }
+        case 10:
+          return { type: 'FreezeAccount' }
+        case 11:
+          return { type: 'ThawAccount' }
+        case 12:
+          return { type: 'TransferChecked' }
+        case 13:
+          return { type: 'ApproveChecked' }
+        case 14:
+          return { type: 'MintToChecked' }
+        case 15:
+          return { type: 'BurnChecked' }
+        case 16:
+          return { type: 'InitializeAccount2' }
+        case 17:
+          return { type: 'SyncNative' }
+        case 18:
+          return { type: 'InitializeAccount3' }
+        case 19:
+          return { type: 'InitializeMultisig2' }
+        case 20:
+          return { type: 'InitializeMint2' }
+        default:
+          return { type: 'Unknown', instruction }
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      errorLogger.logError(new Error(`Failed to decode token program instruction: ${errorMessage}`), {
+        category: 'TRANSACTION_DECODER',
+        context: { data: data.substring(0, 100) },
+        severity: 'low'
+      })
+      return { type: 'Unknown', error: 'Failed to decode' }
     }
   }
 
@@ -194,27 +236,35 @@ export class TransactionDecoderService {
 
   async getAccountInfo(address: string): Promise<AccountInfo | null> {
     try {
-      const publicKey = new PublicKey(address)
-      const accountInfo = await eclipseRPCService.getAccountInfo(publicKey)
-      
-      if (!accountInfo) {
-        return null
-      }
+      return await withBlockchainRetry(async () => {
+        const publicKey = new PublicKey(address)
+        const accountInfo = await eclipseRPCService.getAccountInfo(publicKey)
+        
+        if (!accountInfo) {
+          return null
+        }
 
-      return {
-        address,
-        balance: accountInfo.lamports,
-        owner: accountInfo.owner.toString(),
-        executable: accountInfo.executable,
-        rentEpoch: accountInfo.rentEpoch || 0,
-        data: accountInfo.data ? {
-          program: accountInfo.owner.toString(),
-          space: accountInfo.data.length,
-          parsed: await this.parseAccountData(accountInfo.data, accountInfo.owner),
-        } : undefined,
-      }
+        return {
+          address,
+          balance: accountInfo.lamports,
+          owner: accountInfo.owner.toString(),
+          executable: accountInfo.executable,
+          rentEpoch: accountInfo.rentEpoch || 0,
+          data: accountInfo.data ? {
+            program: accountInfo.owner.toString(),
+            space: accountInfo.data.length,
+            parsed: await this.parseAccountData(accountInfo.data, accountInfo.owner),
+          } : undefined,
+        }
+      })
     } catch (error) {
-      console.error('Failed to get account info:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      errorLogger.logError(new Error(`Failed to get account info: ${errorMessage}`), {
+        category: 'TRANSACTION_DECODER',
+        context: { address },
+        severity: 'medium'
+      })
+      toastService.showError('Failed to fetch account information')
       throw error
     }
   }
@@ -229,7 +279,12 @@ export class TransactionDecoderService {
       
       return { raw: data.toString('base64') }
     } catch (error) {
-      console.error('Failed to parse account data:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      errorLogger.logError(new Error(`Failed to parse account data: ${errorMessage}`), {
+        category: 'TRANSACTION_DECODER',
+        context: { owner: owner.toString(), dataLength: data.length },
+        severity: 'low'
+      })
       return { raw: data.toString('base64'), error: 'Failed to parse' }
     }
   }
@@ -263,7 +318,12 @@ export class TransactionDecoderService {
         closeAuthority: closeAuthority?.toString(),
       }
     } catch (error) {
-      console.error('Failed to parse token account data:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      errorLogger.logError(new Error(`Failed to parse token account data: ${errorMessage}`), {
+        category: 'TRANSACTION_DECODER',
+        context: { dataLength: data.length },
+        severity: 'low'
+      })
       return { error: 'Failed to parse token account data' }
     }
   }
@@ -277,19 +337,27 @@ export class TransactionDecoderService {
     }
   ) {
     try {
-      const publicKey = new PublicKey(address)
-      const signatures = await eclipseRPCService.getSignaturesForAddress(publicKey, options)
-      
-      return signatures.map(sig => ({
-        signature: sig.signature,
-        slot: sig.slot || 0,
-        blockTime: sig.blockTime || 0,
-        fee: 0, // Fee is not available in signature info
-        success: sig.err === null,
-        accounts: [], // This would need to be populated by fetching each transaction
-      }))
+      return await withBlockchainRetry(async () => {
+        const publicKey = new PublicKey(address)
+        const signatures = await eclipseRPCService.getSignaturesForAddress(publicKey, options)
+        
+        return signatures.map(sig => ({
+          signature: sig.signature,
+          slot: sig.slot || 0,
+          blockTime: sig.blockTime || 0,
+          fee: 0, // Fee is not available in signature info
+          success: sig.err === null,
+          accounts: [], // This would need to be populated by fetching each transaction
+        }))
+      })
     } catch (error) {
-      console.error('Failed to search transactions:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      errorLogger.logError(new Error(`Failed to search transactions: ${errorMessage}`), {
+        category: 'TRANSACTION_DECODER',
+        context: { address, options },
+        severity: 'medium'
+      })
+      toastService.showError('Failed to search transactions')
       throw error
     }
   }

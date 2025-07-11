@@ -9,6 +9,9 @@ import {
   PoolInfo,
   TradeHistory 
 } from '../types/dex'
+import { errorLogger } from './errorLogger'
+import { toastService } from './toastService'
+import { withNetworkRetry, withWalletRetry } from '../utils/retry'
 
 const JUPITER_API_URL = 'https://quote-api.jup.ag/v6'
 const RAYDIUM_API_URL = 'https://api.raydium.io/v2'
@@ -27,11 +30,22 @@ export class DexService {
   // Jupiter API methods
   async getTokenList(): Promise<TokenInfo[]> {
     try {
-      const response = await fetch(`${this.jupiterApiUrl}/tokens`)
-      const tokens: TokenInfo[] = await response.json()
-      return tokens.filter(token => token.symbol && token.name)
+      return await withNetworkRetry(async () => {
+        const response = await fetch(`${this.jupiterApiUrl}/tokens`)
+        if (!response.ok) {
+          throw new Error(`Failed to fetch token list: ${response.status} ${response.statusText}`)
+        }
+        const tokens: TokenInfo[] = await response.json()
+        return tokens.filter(token => token.symbol && token.name)
+      })
     } catch (error) {
-      console.error('Error fetching token list:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      errorLogger.logError(new Error(`Failed to fetch token list: ${errorMessage}`), {
+        category: 'DEX',
+        context: { method: 'getTokenList', apiUrl: this.jupiterApiUrl },
+        severity: 'medium'
+      })
+      toastService.showError('Failed to fetch token list')
       return []
     }
   }
@@ -43,39 +57,61 @@ export class DexService {
     slippageBps: number = 50
   ): Promise<Route | null> {
     try {
-      const params = new URLSearchParams({
-        inputMint,
-        outputMint,
-        amount: amount.toString(),
-        slippageBps: slippageBps.toString(),
-        onlyDirectRoutes: 'false',
-        asLegacyTransaction: 'false'
-      })
+      return await withNetworkRetry(async () => {
+        const params = new URLSearchParams({
+          inputMint,
+          outputMint,
+          amount: amount.toString(),
+          slippageBps: slippageBps.toString(),
+          onlyDirectRoutes: 'false',
+          asLegacyTransaction: 'false'
+        })
 
-      const response = await fetch(`${this.jupiterApiUrl}/quote?${params}`)
-      const quote: Route = await response.json()
-      
-      return quote
+        const response = await fetch(`${this.jupiterApiUrl}/quote?${params}`)
+        if (!response.ok) {
+          throw new Error(`Failed to get quote: ${response.status} ${response.statusText}`)
+        }
+        const quote: Route = await response.json()
+        
+        return quote
+      })
     } catch (error) {
-      console.error('Error getting quote:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      errorLogger.logError(new Error(`Failed to get quote: ${errorMessage}`), {
+        category: 'DEX',
+        context: { method: 'getQuote', inputMint, outputMint, amount, slippageBps },
+        severity: 'medium'
+      })
+      toastService.showError('Failed to get swap quote')
       return null
     }
   }
 
   async getSwapTransaction(swapRequest: SwapRequest): Promise<SwapResponse | null> {
     try {
-      const response = await fetch(`${this.jupiterApiUrl}/swap`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(swapRequest)
-      })
+      return await withNetworkRetry(async () => {
+        const response = await fetch(`${this.jupiterApiUrl}/swap`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(swapRequest)
+        })
 
-      const swapResponse: SwapResponse = await response.json()
-      return swapResponse
+        if (!response.ok) {
+          throw new Error(`Failed to get swap transaction: ${response.status} ${response.statusText}`)
+        }
+        const swapResponse: SwapResponse = await response.json()
+        return swapResponse
+      })
     } catch (error) {
-      console.error('Error getting swap transaction:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      errorLogger.logError(new Error(`Failed to get swap transaction: ${errorMessage}`), {
+        category: 'DEX',
+        context: { method: 'getSwapTransaction', swapRequest },
+        severity: 'high'
+      })
+      toastService.showError('Failed to create swap transaction')
       return null
     }
   }
@@ -88,19 +124,40 @@ export class DexService {
       const swapTransactionBuf = Buffer.from(swapTransaction, 'base64')
       const transaction = VersionedTransaction.deserialize(swapTransactionBuf)
       
-      const signedTransaction = await wallet.signTransaction(transaction)
-      const signature = await this.connection.sendRawTransaction(
-        signedTransaction.serialize(),
-        {
-          skipPreflight: true,
-          maxRetries: 2
-        }
-      )
+      const signedTransaction = await withWalletRetry(async () => {
+        return await wallet.signTransaction(transaction)
+      })
+      
+      const signature = await withNetworkRetry(async () => {
+        return await this.connection.sendRawTransaction(
+          signedTransaction.serialize(),
+          {
+            skipPreflight: true,
+            maxRetries: 2
+          }
+        )
+      })
 
       await this.connection.confirmTransaction(signature, 'confirmed')
+      toastService.showSuccess('Swap executed successfully')
       return signature
     } catch (error) {
-      console.error('Error executing swap:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      const isUserRejection = errorMessage.toLowerCase().includes('user') || 
+                               errorMessage.toLowerCase().includes('rejected')
+      
+      errorLogger.logError(new Error(`Failed to execute swap: ${errorMessage}`), {
+        category: 'DEX',
+        context: { method: 'executeSwap', isUserRejection },
+        severity: isUserRejection ? 'low' : 'high'
+      })
+      
+      if (isUserRejection) {
+        toastService.showInfo('Swap cancelled by user')
+      } else {
+        toastService.showError('Failed to execute swap')
+      }
+      
       return null
     }
   }
@@ -108,50 +165,72 @@ export class DexService {
   // Token price information
   async getTokenPrice(tokenAddress: string): Promise<TokenPrice | null> {
     try {
-      const response = await fetch(`${this.jupiterApiUrl}/price?ids=${tokenAddress}`)
-      const priceData = await response.json()
-      
-      if (priceData.data && priceData.data[tokenAddress]) {
-        const price = priceData.data[tokenAddress]
-        return {
-          id: tokenAddress,
-          mintSymbol: price.mintSymbol || '',
-          vsToken: price.vsToken || 'USDC',
-          vsTokenSymbol: price.vsTokenSymbol || 'USDC',
-          price: price.price || 0,
-          priceChange24h: price.priceChange24h
+      return await withNetworkRetry(async () => {
+        const response = await fetch(`${this.jupiterApiUrl}/price?ids=${tokenAddress}`)
+        if (!response.ok) {
+          throw new Error(`Failed to fetch token price: ${response.status} ${response.statusText}`)
         }
-      }
-      
-      return null
+        const priceData = await response.json()
+        
+        if (priceData.data && priceData.data[tokenAddress]) {
+          const price = priceData.data[tokenAddress]
+          return {
+            id: tokenAddress,
+            mintSymbol: price.mintSymbol || '',
+            vsToken: price.vsToken || 'USDC',
+            vsTokenSymbol: price.vsTokenSymbol || 'USDC',
+            price: price.price || 0,
+            priceChange24h: price.priceChange24h
+          }
+        }
+        
+        return null
+      })
     } catch (error) {
-      console.error('Error fetching token price:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      errorLogger.logError(new Error(`Failed to fetch token price: ${errorMessage}`), {
+        category: 'DEX',
+        context: { method: 'getTokenPrice', tokenAddress },
+        severity: 'medium'
+      })
+      toastService.showError('Failed to fetch token price')
       return null
     }
   }
 
   async getMultipleTokenPrices(tokenAddresses: string[]): Promise<TokenPrice[]> {
     try {
-      const ids = tokenAddresses.join(',')
-      const response = await fetch(`${this.jupiterApiUrl}/price?ids=${ids}`)
-      const priceData = await response.json()
-      
-      const prices: TokenPrice[] = []
-      for (const [address, data] of Object.entries(priceData.data || {})) {
-        const price = data as any
-        prices.push({
-          id: address,
-          mintSymbol: price.mintSymbol || '',
-          vsToken: price.vsToken || 'USDC',
-          vsTokenSymbol: price.vsTokenSymbol || 'USDC',
-          price: price.price || 0,
-          priceChange24h: price.priceChange24h
-        })
-      }
-      
-      return prices
+      return await withNetworkRetry(async () => {
+        const ids = tokenAddresses.join(',')
+        const response = await fetch(`${this.jupiterApiUrl}/price?ids=${ids}`)
+        if (!response.ok) {
+          throw new Error(`Failed to fetch token prices: ${response.status} ${response.statusText}`)
+        }
+        const priceData = await response.json()
+        
+        const prices: TokenPrice[] = []
+        for (const [address, data] of Object.entries(priceData.data || {})) {
+          const price = data as any
+          prices.push({
+            id: address,
+            mintSymbol: price.mintSymbol || '',
+            vsToken: price.vsToken || 'USDC',
+            vsTokenSymbol: price.vsTokenSymbol || 'USDC',
+            price: price.price || 0,
+            priceChange24h: price.priceChange24h
+          })
+        }
+        
+        return prices
+      })
     } catch (error) {
-      console.error('Error fetching multiple token prices:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      errorLogger.logError(new Error(`Failed to fetch multiple token prices: ${errorMessage}`), {
+        category: 'DEX',
+        context: { method: 'getMultipleTokenPrices', tokenAddresses },
+        severity: 'medium'
+      })
+      toastService.showError('Failed to fetch token prices')
       return []
     }
   }
@@ -159,33 +238,44 @@ export class DexService {
   // Raydium API methods
   async getRaydiumPools(): Promise<PoolInfo[]> {
     try {
-      const response = await fetch(`${this.raydiumApiUrl}/main/pairs`)
-      const pools = await response.json()
-      
-      return pools.map((pool: any) => ({
-        id: pool.ammId,
-        tokenA: {
-          address: pool.baseMint,
-          symbol: pool.baseSymbol,
-          name: pool.baseName,
-          decimals: pool.baseDecimals,
-          logoURI: pool.baseLogoURI
-        },
-        tokenB: {
-          address: pool.quoteMint,
-          symbol: pool.quoteSymbol,
-          name: pool.quoteName,
-          decimals: pool.quoteDecimals,
-          logoURI: pool.quoteLogoURI
-        },
-        liquidity: pool.liquidity?.toString() || '0',
-        volume24h: pool.volume24h?.toString() || '0',
-        fees24h: pool.fees24h?.toString() || '0',
-        apy: pool.apy || 0,
-        tvl: pool.tvl?.toString() || '0'
-      }))
+      return await withNetworkRetry(async () => {
+        const response = await fetch(`${this.raydiumApiUrl}/main/pairs`)
+        if (!response.ok) {
+          throw new Error(`Failed to fetch Raydium pools: ${response.status} ${response.statusText}`)
+        }
+        const pools = await response.json()
+        
+        return pools.map((pool: any) => ({
+          id: pool.ammId,
+          tokenA: {
+            address: pool.baseMint,
+            symbol: pool.baseSymbol,
+            name: pool.baseName,
+            decimals: pool.baseDecimals,
+            logoURI: pool.baseLogoURI
+          },
+          tokenB: {
+            address: pool.quoteMint,
+            symbol: pool.quoteSymbol,
+            name: pool.quoteName,
+            decimals: pool.quoteDecimals,
+            logoURI: pool.quoteLogoURI
+          },
+          liquidity: pool.liquidity?.toString() || '0',
+          volume24h: pool.volume24h?.toString() || '0',
+          fees24h: pool.fees24h?.toString() || '0',
+          apy: pool.apy || 0,
+          tvl: pool.tvl?.toString() || '0'
+        }))
+      })
     } catch (error) {
-      console.error('Error fetching Raydium pools:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      errorLogger.logError(new Error(`Failed to fetch Raydium pools: ${errorMessage}`), {
+        category: 'DEX',
+        context: { method: 'getRaydiumPools', apiUrl: this.raydiumApiUrl },
+        severity: 'medium'
+      })
+      toastService.showError('Failed to fetch liquidity pools')
       return []
     }
   }
@@ -233,19 +323,29 @@ export class DexService {
 
   private async getRaydiumStats(): Promise<DEXStats> {
     try {
-      const response = await fetch(`${this.raydiumApiUrl}/main/info`)
-      const stats = await response.json()
-      
-      return {
-        totalVolume24h: stats.totalVolume24h || 0,
-        totalTrades24h: stats.totalTrades24h || 0,
-        totalFees24h: stats.totalFees24h || 0,
-        uniqueTraders24h: stats.uniqueTraders24h || 0,
-        topTokens: stats.topTokens || [],
-        priceChanges24h: stats.priceChanges24h || {}
-      }
+      return await withNetworkRetry(async () => {
+        const response = await fetch(`${this.raydiumApiUrl}/main/info`)
+        if (!response.ok) {
+          throw new Error(`Failed to fetch Raydium stats: ${response.status} ${response.statusText}`)
+        }
+        const stats = await response.json()
+        
+        return {
+          totalVolume24h: stats.totalVolume24h || 0,
+          totalTrades24h: stats.totalTrades24h || 0,
+          totalFees24h: stats.totalFees24h || 0,
+          uniqueTraders24h: stats.uniqueTraders24h || 0,
+          topTokens: stats.topTokens || [],
+          priceChanges24h: stats.priceChanges24h || {}
+        }
+      })
     } catch (error) {
-      console.error('Error fetching Raydium stats:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      errorLogger.logError(new Error(`Failed to fetch Raydium stats: ${errorMessage}`), {
+        category: 'DEX',
+        context: { method: 'getRaydiumStats', apiUrl: this.raydiumApiUrl },
+        severity: 'medium'
+      })
       return {
         totalVolume24h: 0,
         totalTrades24h: 0,
@@ -259,16 +359,37 @@ export class DexService {
 
   // Trade history management
   async getTradeHistory(walletAddress: string): Promise<TradeHistory[]> {
-    // This would typically fetch from a backend or indexer
-    // For now, return from localStorage
-    const stored = localStorage.getItem(`trade_history_${walletAddress}`)
-    return stored ? JSON.parse(stored) : []
+    try {
+      // This would typically fetch from a backend or indexer
+      // For now, return from localStorage
+      const stored = localStorage.getItem(`trade_history_${walletAddress}`)
+      return stored ? JSON.parse(stored) : []
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      errorLogger.logError(new Error(`Failed to get trade history: ${errorMessage}`), {
+        category: 'DEX',
+        context: { method: 'getTradeHistory', walletAddress },
+        severity: 'medium'
+      })
+      toastService.showError('Failed to load trade history')
+      return []
+    }
   }
 
   async saveTradeHistory(walletAddress: string, trade: TradeHistory): Promise<void> {
-    const existing = await this.getTradeHistory(walletAddress)
-    const updated = [trade, ...existing].slice(0, 100) // Keep last 100 trades
-    localStorage.setItem(`trade_history_${walletAddress}`, JSON.stringify(updated))
+    try {
+      const existing = await this.getTradeHistory(walletAddress)
+      const updated = [trade, ...existing].slice(0, 100) // Keep last 100 trades
+      localStorage.setItem(`trade_history_${walletAddress}`, JSON.stringify(updated))
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      errorLogger.logError(new Error(`Failed to save trade history: ${errorMessage}`), {
+        category: 'DEX',
+        context: { method: 'saveTradeHistory', walletAddress, trade },
+        severity: 'medium'
+      })
+      toastService.showError('Failed to save trade history')
+    }
   }
 
   // Helper methods
@@ -278,6 +399,12 @@ export class DexService {
       const accountInfo = await this.connection.getAccountInfo(publicKey)
       return accountInfo !== null
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      errorLogger.logError(new Error(`Failed to validate token address: ${errorMessage}`), {
+        category: 'DEX',
+        context: { method: 'isValidTokenAddress', address },
+        severity: 'low'
+      })
       return false
     }
   }

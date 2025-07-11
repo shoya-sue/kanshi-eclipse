@@ -1,4 +1,7 @@
 import { ECLIPSE_RPC_CONFIG } from '../utils/constants'
+import { errorLogger } from './errorLogger'
+import { toastService } from './toastService'
+import { withNetworkRetry } from '../utils/retry'
 
 export interface WebSocketMessage {
   type: string
@@ -36,10 +39,13 @@ export class WebSocketService {
         this.ws = new WebSocket(this.url)
         
         this.ws.onopen = () => {
-          console.log('WebSocket connected')
+          errorLogger.logInfo('WebSocket connected successfully', {
+            context: { url: this.url, reconnectAttempts: this.reconnectAttempts }
+          })
           this.isConnecting = false
           this.reconnectAttempts = 0
           this.resubscribeAll()
+          toastService.showSuccess('WebSocket connected')
           resolve()
         }
         
@@ -48,14 +54,25 @@ export class WebSocketService {
         }
         
         this.ws.onclose = (event) => {
-          console.log('WebSocket disconnected:', event.code, event.reason)
+          const errorMessage = `WebSocket disconnected: ${event.code} ${event.reason}`
+          errorLogger.logError(new Error(errorMessage), {
+            category: 'WEBSOCKET',
+            context: { code: event.code, reason: event.reason, url: this.url },
+            severity: 'medium'
+          })
           this.isConnecting = false
           this.scheduleReconnect()
         }
         
         this.ws.onerror = (error) => {
-          console.error('WebSocket error:', error)
+          const errorMessage = error instanceof Error ? error.message : 'WebSocket connection error'
+          errorLogger.logError(new Error(`WebSocket error: ${errorMessage}`), {
+            category: 'WEBSOCKET',
+            context: { url: this.url, reconnectAttempts: this.reconnectAttempts },
+            severity: 'high'
+          })
           this.isConnecting = false
+          toastService.showError('WebSocket connection failed')
           reject(error)
         }
         
@@ -63,45 +80,98 @@ export class WebSocketService {
         setTimeout(() => {
           if (this.isConnecting) {
             this.isConnecting = false
-            reject(new Error('WebSocket connection timeout'))
+            const timeoutError = new Error('WebSocket connection timeout')
+            errorLogger.logError(timeoutError, {
+              category: 'WEBSOCKET',
+              context: { url: this.url, timeout: 10000 },
+              severity: 'high'
+            })
+            toastService.showError('WebSocket connection timeout')
+            reject(timeoutError)
           }
         }, 10000)
         
       } catch (error) {
         this.isConnecting = false
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        errorLogger.logError(new Error(`Failed to create WebSocket: ${errorMessage}`), {
+          category: 'WEBSOCKET',
+          context: { url: this.url },
+          severity: 'high'
+        })
+        toastService.showError('Failed to create WebSocket connection')
         reject(error)
       }
     })
   }
 
   disconnect(): void {
-    if (this.reconnectTimeout) {
-      clearTimeout(this.reconnectTimeout)
-      this.reconnectTimeout = null
+    try {
+      if (this.reconnectTimeout) {
+        clearTimeout(this.reconnectTimeout)
+        this.reconnectTimeout = null
+      }
+      
+      if (this.ws) {
+        this.ws.close()
+        this.ws = null
+      }
+      
+      this.subscriptions.clear()
+      errorLogger.logInfo('WebSocket disconnected successfully', {
+        context: { url: this.url }
+      })
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      errorLogger.logError(new Error(`Failed to disconnect WebSocket: ${errorMessage}`), {
+        category: 'WEBSOCKET',
+        context: { url: this.url },
+        severity: 'medium'
+      })
     }
-    
-    if (this.ws) {
-      this.ws.close()
-      this.ws = null
-    }
-    
-    this.subscriptions.clear()
   }
 
   subscribe(subscription: WebSocketSubscription): void {
-    this.subscriptions.set(subscription.id, subscription)
-    
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.sendSubscription(subscription)
+    try {
+      this.subscriptions.set(subscription.id, subscription)
+      
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        this.sendSubscription(subscription)
+      }
+      
+      errorLogger.logInfo('WebSocket subscription added', {
+        context: { subscriptionId: subscription.id, type: subscription.type }
+      })
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      errorLogger.logError(new Error(`Failed to add WebSocket subscription: ${errorMessage}`), {
+        category: 'WEBSOCKET',
+        context: { subscriptionId: subscription.id, type: subscription.type },
+        severity: 'medium'
+      })
+      toastService.showError('Failed to add WebSocket subscription')
     }
   }
 
   unsubscribe(id: string): void {
-    const subscription = this.subscriptions.get(id)
-    if (subscription && this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.sendUnsubscription(subscription)
+    try {
+      const subscription = this.subscriptions.get(id)
+      if (subscription && this.ws && this.ws.readyState === WebSocket.OPEN) {
+        this.sendUnsubscription(subscription)
+      }
+      this.subscriptions.delete(id)
+      
+      errorLogger.logInfo('WebSocket subscription removed', {
+        context: { subscriptionId: id }
+      })
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      errorLogger.logError(new Error(`Failed to remove WebSocket subscription: ${errorMessage}`), {
+        category: 'WEBSOCKET',
+        context: { subscriptionId: id },
+        severity: 'medium'
+      })
     }
-    this.subscriptions.delete(id)
   }
 
   private handleMessage(data: string): void {
@@ -111,11 +181,25 @@ export class WebSocketService {
       // Find matching subscription and call callback
       for (const [, subscription] of this.subscriptions) {
         if (this.messageMatchesSubscription(message, subscription)) {
-          subscription.callback(message.data)
+          try {
+            subscription.callback(message.data)
+          } catch (callbackError) {
+            const errorMessage = callbackError instanceof Error ? callbackError.message : 'Unknown error'
+            errorLogger.logError(new Error(`WebSocket callback error: ${errorMessage}`), {
+              category: 'WEBSOCKET',
+              context: { subscriptionId: subscription.id, type: subscription.type },
+              severity: 'medium'
+            })
+          }
         }
       }
     } catch (error) {
-      console.error('Failed to parse WebSocket message:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      errorLogger.logError(new Error(`Failed to parse WebSocket message: ${errorMessage}`), {
+        category: 'WEBSOCKET',
+        context: { data: data.substring(0, 100) }, // Log first 100 chars
+        severity: 'medium'
+      })
     }
   }
 
@@ -125,29 +209,47 @@ export class WebSocketService {
   }
 
   private sendSubscription(subscription: WebSocketSubscription): void {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return
-    
-    const message = {
-      jsonrpc: '2.0',
-      id: subscription.id,
-      method: this.getSubscriptionMethod(subscription.type),
-      params: subscription.params || {},
+    try {
+      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return
+      
+      const message = {
+        jsonrpc: '2.0',
+        id: subscription.id,
+        method: this.getSubscriptionMethod(subscription.type),
+        params: subscription.params || {},
+      }
+      
+      this.ws.send(JSON.stringify(message))
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      errorLogger.logError(new Error(`Failed to send WebSocket subscription: ${errorMessage}`), {
+        category: 'WEBSOCKET',
+        context: { subscriptionId: subscription.id, type: subscription.type },
+        severity: 'medium'
+      })
     }
-    
-    this.ws.send(JSON.stringify(message))
   }
 
   private sendUnsubscription(subscription: WebSocketSubscription): void {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return
-    
-    const message = {
-      jsonrpc: '2.0',
-      id: subscription.id,
-      method: this.getUnsubscriptionMethod(subscription.type),
-      params: [subscription.id],
+    try {
+      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return
+      
+      const message = {
+        jsonrpc: '2.0',
+        id: subscription.id,
+        method: this.getUnsubscriptionMethod(subscription.type),
+        params: [subscription.id],
+      }
+      
+      this.ws.send(JSON.stringify(message))
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      errorLogger.logError(new Error(`Failed to send WebSocket unsubscription: ${errorMessage}`), {
+        category: 'WEBSOCKET',
+        context: { subscriptionId: subscription.id, type: subscription.type },
+        severity: 'medium'
+      })
     }
-    
-    this.ws.send(JSON.stringify(message))
   }
 
   private getSubscriptionMethod(type: string): string {
@@ -181,26 +283,67 @@ export class WebSocketService {
   }
 
   private resubscribeAll(): void {
-    for (const [, subscription] of this.subscriptions) {
-      this.sendSubscription(subscription)
+    try {
+      for (const [, subscription] of this.subscriptions) {
+        this.sendSubscription(subscription)
+      }
+      
+      if (this.subscriptions.size > 0) {
+        errorLogger.logInfo('WebSocket subscriptions reestablished', {
+          context: { count: this.subscriptions.size }
+        })
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      errorLogger.logError(new Error(`Failed to resubscribe to WebSocket: ${errorMessage}`), {
+        category: 'WEBSOCKET',
+        context: { subscriptionCount: this.subscriptions.size },
+        severity: 'medium'
+      })
     }
   }
 
   private scheduleReconnect(): void {
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error('Max reconnect attempts reached')
-      return
-    }
-    
-    const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts)
-    this.reconnectAttempts++
-    
-    this.reconnectTimeout = setTimeout(() => {
-      console.log(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`)
-      this.connect().catch(error => {
-        console.error('Reconnect failed:', error)
+    try {
+      if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+        const maxAttemptsError = new Error(`Max reconnect attempts reached (${this.maxReconnectAttempts})`)
+        errorLogger.logError(maxAttemptsError, {
+          category: 'WEBSOCKET',
+          context: { maxReconnectAttempts: this.maxReconnectAttempts, url: this.url },
+          severity: 'high'
+        })
+        toastService.showError('WebSocket connection failed after multiple attempts')
+        return
+      }
+      
+      const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts)
+      this.reconnectAttempts++
+      
+      errorLogger.logInfo(`Scheduling WebSocket reconnect attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts}`, {
+        context: { delay, url: this.url }
       })
-    }, delay)
+      
+      this.reconnectTimeout = setTimeout(() => {
+        errorLogger.logInfo(`Attempting WebSocket reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})`, {
+          context: { url: this.url }
+        })
+        this.connect().catch(error => {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+          errorLogger.logError(new Error(`WebSocket reconnect failed: ${errorMessage}`), {
+            category: 'WEBSOCKET',
+            context: { attempt: this.reconnectAttempts, url: this.url },
+            severity: 'medium'
+          })
+        })
+      }, delay)
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      errorLogger.logError(new Error(`Failed to schedule WebSocket reconnect: ${errorMessage}`), {
+        category: 'WEBSOCKET',
+        context: { url: this.url },
+        severity: 'medium'
+      })
+    }
   }
 
   get isConnected(): boolean {
