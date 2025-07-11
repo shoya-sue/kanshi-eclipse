@@ -1,9 +1,20 @@
-name: Deploy to GitHub Pages
+name: Production Deployment
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
+    tags: ['v*']
   workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+          - github-pages
 
 permissions:
   contents: read
@@ -11,48 +22,144 @@ permissions:
   id-token: write
 
 concurrency:
-  group: "pages"
+  group: "deploy-${{ github.event.inputs.environment || 'production' }}"
   cancel-in-progress: false
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20.x'
-        cache: 'npm'
-    
-    - name: Setup Pages
-      uses: actions/configure-pages@v4
-    
-    - name: Install dependencies
-      run: npm ci
-    
-    - name: Build project
-      run: npm run build
-      env:
-        VITE_BASE_URL: '/eclipse-chain-tools/'
-    
-    - name: Upload artifact
-      uses: actions/upload-pages-artifact@v3
-      with:
-        path: './dist'
+env:
+  NODE_VERSION: '18'
 
-  deploy:
+jobs:
+  # GitHub Pages Deployment
+  deploy-pages:
+    name: Deploy to GitHub Pages
+    runs-on: ubuntu-latest
+    if: github.event.inputs.environment == 'github-pages' || (github.event.inputs.environment == '' && github.ref == 'refs/heads/main')
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run tests
+        run: npm run test
+      
+      - name: Build project
+        run: npm run build
+        env:
+          VITE_BASE_URL: '/kanshi-eclipse/'
+          NODE_ENV: production
+      
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './dist'
+      
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  # Netlify Deployment (Production/Staging)
+  deploy-netlify:
+    name: Deploy to ${{ github.event.inputs.environment || 'production' }}
     runs-on: ubuntu-latest
-    needs: build
+    if: github.event.inputs.environment == 'production' || github.event.inputs.environment == 'staging' || (github.event.inputs.environment == '' && startsWith(github.ref, 'refs/tags/'))
+    environment: ${{ github.event.inputs.environment || 'production' }}
     
     steps:
-    - name: Deploy to GitHub Pages
-      id: deployment
-      uses: actions/deploy-pages@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm run test
+
+      - name: Build application
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Deploy to Netlify
+        uses: nwtgck/actions-netlify@v2.0
+        with:
+          publish-dir: './dist'
+          production-deploy: ${{ github.event.inputs.environment == 'production' || startsWith(github.ref, 'refs/tags/') }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          deploy-message: "Deployment from ${{ github.sha }} to ${{ github.event.inputs.environment || 'production' }}"
+          enable-pull-request-comment: false
+          enable-commit-comment: true
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        timeout-minutes: 15
+
+  # Post-deployment notifications
+  notify:
+    name: Send Notifications
+    runs-on: ubuntu-latest
+    needs: [deploy-pages, deploy-netlify]
+    if: always() && (needs.deploy-pages.result != 'skipped' || needs.deploy-netlify.result != 'skipped')
+    
+    steps:
+      - name: Generate deployment summary
+        run: |
+          echo "## 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ needs.deploy-pages.result }}" != "skipped" ]]; then
+            if [[ "${{ needs.deploy-pages.result }}" == "success" ]]; then
+              echo "✅ **GitHub Pages**: Deployment successful" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "❌ **GitHub Pages**: Deployment failed" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+          
+          if [[ "${{ needs.deploy-netlify.result }}" != "skipped" ]]; then
+            if [[ "${{ needs.deploy-netlify.result }}" == "success" ]]; then
+              echo "✅ **Netlify**: Deployment successful" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "❌ **Netlify**: Deployment failed" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Details:" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: ${{ github.event.inputs.environment || 'production' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Deployed by**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Timestamp**: $(date -u)" >> $GITHUB_STEP_SUMMARY
+
+      - name: Check deployment status
+        run: |
+          pages_result="${{ needs.deploy-pages.result }}"
+          netlify_result="${{ needs.deploy-netlify.result }}"
+          
+          if [[ "$pages_result" == "failure" || "$netlify_result" == "failure" ]]; then
+            echo "❌ One or more deployments failed"
+            exit 1
+          elif [[ "$pages_result" == "success" || "$netlify_result" == "success" ]]; then
+            echo "✅ Deployment completed successfully"
+          else
+            echo "ℹ️ No deployments were executed"
+          fi
