@@ -1,10 +1,16 @@
 import { Link, useLocation } from 'react-router-dom'
-import { Activity, Search, Server, Wallet, ArrowLeftRight } from 'lucide-react'
+import { Activity, Search, Server, Wallet, ArrowLeftRight, Settings, LayoutDashboard } from 'lucide-react'
 
 const Navigation = () => {
   const location = useLocation()
   
   const navItems = [
+    {
+      path: '/dashboard',
+      name: 'ダッシュボード',
+      icon: LayoutDashboard,
+      description: 'カスタマイズ可能なダッシュボード',
+    },
     {
       path: '/gas-tracker',
       name: 'ガス料金トラッカー',
@@ -35,16 +41,22 @@ const Navigation = () => {
       icon: ArrowLeftRight,
       description: 'トークンの交換と取引',
     },
+    {
+      path: '/settings',
+      name: '設定',
+      icon: Settings,
+      description: 'アプリケーションの設定',
+    },
   ]
 
   return (
-    <nav className="bg-gray-50 border-b border-gray-200">
+    <nav className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
       <div className="container mx-auto px-4">
         <div className="flex space-x-8">
           {navItems.map((item) => {
             const Icon = item.icon
             const isActive = location.pathname === item.path || 
-                           (location.pathname === '/' && item.path === '/gas-tracker')
+                           (location.pathname === '/' && item.path === '/dashboard')
             
             return (
               <Link
@@ -52,14 +64,14 @@ const Navigation = () => {
                 to={item.path}
                 className={`flex items-center space-x-3 px-4 py-4 border-b-2 transition-colors ${
                   isActive
-                    ? 'border-eclipse-primary text-eclipse-primary bg-white'
-                    : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+                    ? 'border-eclipse-primary text-eclipse-primary bg-white dark:bg-gray-900'
+                    : 'border-transparent text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:border-gray-300 dark:hover:border-gray-500'
                 }`}
               >
                 <Icon className="w-5 h-5" />
                 <div className="hidden md:block">
                   <div className="font-medium">{item.name}</div>
-                  <div className="text-xs text-gray-500">{item.description}</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">{item.description}</div>
                 </div>
               </Link>
             )
