@@ -1,6 +1,6 @@
 import { useNetworkStats } from '../../hooks/useRPCHealth'
 import { formatNumber, formatDuration } from '../../utils/formatters'
-import { Activity, Zap, Clock, TrendingUp, AlertTriangle } from 'lucide-react'
+import { Activity, Zap, TrendingUp, AlertTriangle } from 'lucide-react'
 import LoadingSpinner from '../Common/LoadingSpinner'
 import Card from '../Common/Card'
 

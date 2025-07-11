@@ -124,9 +124,14 @@ export class EclipseRPCService {
 
   async estimateGasFee(transaction: Transaction | VersionedTransaction): Promise<number> {
     try {
-      const feeCalculator = await this.connection.getFeeForMessage(
-        transaction.compileMessage()
-      )
+      let message
+      if (transaction instanceof Transaction) {
+        message = transaction.compileMessage()
+      } else {
+        message = transaction.message
+      }
+      
+      const feeCalculator = await this.connection.getFeeForMessage(message)
       return feeCalculator?.value || 0
     } catch (error) {
       console.error('Failed to estimate gas fee:', error)

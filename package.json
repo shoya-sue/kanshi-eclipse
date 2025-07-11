@@ -2,11 +2,12 @@
   "name": "eclipse-chain-tools",
   "version": "1.0.0",
   "description": "Eclipse チェーン用のフロントエンドツール集",
+  "type": "module",
   "main": "index.js",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "lint": "eslint . --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },
   "dependencies": {

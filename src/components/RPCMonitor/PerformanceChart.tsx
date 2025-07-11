@@ -11,7 +11,7 @@ import {
   ChartOptions,
 } from 'chart.js'
 import { useAllRPCHealth } from '../../hooks/useRPCHealth'
-import { formatNumber, formatDuration } from '../../utils/formatters'
+import { formatNumber } from '../../utils/formatters'
 import { CHART_COLORS } from '../../utils/constants'
 import { BarChart3 } from 'lucide-react'
 import LoadingSpinner from '../Common/LoadingSpinner'
@@ -58,8 +58,8 @@ const PerformanceChart = () => {
   })
 
   const datasets = healthData
-    .filter(health => health.endpoint.isActive)
-    .map((health, index) => ({
+    .filter((health: any) => health.endpoint.isActive)
+    .map((health: any, index: number) => ({
       label: health.endpoint.name,
       data: hours.map(() => {
         // Generate mock response time data based on actual average
@@ -157,7 +157,7 @@ const PerformanceChart = () => {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-gray-200">
-          {healthData.slice(0, 3).map((health) => (
+          {healthData.slice(0, 3).map((health: any) => (
             <div key={health.endpoint.id} className="text-center">
               <div className="text-lg font-semibold text-gray-900">
                 {formatNumber(health.avgResponseTime)}ms

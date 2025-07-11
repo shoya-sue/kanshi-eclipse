@@ -17,15 +17,25 @@ export class TransactionDecoderService {
       }
 
       const instructions: InstructionDetail[] = []
+      const message = transaction.transaction.message
       
-      if (transaction.transaction.message.instructions) {
-        for (const instruction of transaction.transaction.message.instructions) {
-          const programId = transaction.transaction.message.accountKeys[instruction.programIdIndex]
+      // Handle both legacy and versioned transactions
+      if ('instructions' in message && message.instructions) {
+        let accountKeys: any
+        if ('accountKeys' in message) {
+          accountKeys = message.accountKeys
+        } else {
+          // For versioned transactions, we need to get account keys differently
+          accountKeys = []
+        }
+        
+        for (const instruction of message.instructions) {
+          const programId = accountKeys[instruction.programIdIndex]
           
           instructions.push({
-            programId: programId.toString(),
-            accounts: instruction.accounts.map(index => 
-              transaction.transaction.message.accountKeys[index].toString()
+            programId: programId?.toString() || 'Unknown',
+            accounts: instruction.accounts.map((index: number) => 
+              accountKeys[index]?.toString() || 'Unknown'
             ),
             data: instruction.data,
             decodedData: await this.decodeInstructionData(instruction.data, programId),
@@ -41,7 +51,9 @@ export class TransactionDecoderService {
         fee: transaction.meta?.fee || 0,
         success: transaction.meta?.err === null,
         err: transaction.meta?.err ? JSON.stringify(transaction.meta.err) : undefined,
-        accounts: transaction.transaction.message.accountKeys.map(key => key.toString()),
+        accounts: 'accountKeys' in transaction.transaction.message 
+          ? transaction.transaction.message.accountKeys.map((key: any) => key.toString())
+          : [],
         instructions,
         logMessages: transaction.meta?.logMessages || [],
       }
@@ -194,7 +206,7 @@ export class TransactionDecoderService {
         balance: accountInfo.lamports,
         owner: accountInfo.owner.toString(),
         executable: accountInfo.executable,
-        rentEpoch: accountInfo.rentEpoch,
+        rentEpoch: accountInfo.rentEpoch || 0,
         data: accountInfo.data ? {
           program: accountInfo.owner.toString(),
           space: accountInfo.data.length,
@@ -270,9 +282,9 @@ export class TransactionDecoderService {
       
       return signatures.map(sig => ({
         signature: sig.signature,
-        slot: sig.slot,
+        slot: sig.slot || 0,
         blockTime: sig.blockTime || 0,
-        fee: sig.fee || 0,
+        fee: 0, // Fee is not available in signature info
         success: sig.err === null,
         accounts: [], // This would need to be populated by fetching each transaction
       }))

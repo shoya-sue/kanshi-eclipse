@@ -18,7 +18,7 @@ const EndpointList = ({ selectedEndpointId, onEndpointSelect }: EndpointListProp
   const updateEndpoints = useUpdateRPCEndpoints()
   
   const [isAdding, setIsAdding] = useState(false)
-  const [editingId, setEditingId] = useState<string | null>(null)
+  // const [editingId] = useState<string | null>(null)
   const [newEndpoint, setNewEndpoint] = useState({ name: '', url: '' })
 
   const handleAddEndpoint = () => {
@@ -35,17 +35,17 @@ const EndpointList = ({ selectedEndpointId, onEndpointSelect }: EndpointListProp
       blockHeight: 0,
     }
     
-    updateEndpoints([...endpoints, endpoint])
+    updateEndpoints([...(endpoints || []), endpoint])
     setNewEndpoint({ name: '', url: '' })
     setIsAdding(false)
   }
 
   const handleDeleteEndpoint = (id: string) => {
-    updateEndpoints(endpoints.filter(ep => ep.id !== id))
+    updateEndpoints((endpoints || []).filter(ep => ep.id !== id))
   }
 
   const handleToggleEndpoint = (id: string) => {
-    updateEndpoints(endpoints.map(ep => 
+    updateEndpoints((endpoints || []).map(ep => 
       ep.id === id ? { ...ep, isActive: !ep.isActive } : ep
     ))
   }
@@ -150,7 +150,7 @@ const EndpointList = ({ selectedEndpointId, onEndpointSelect }: EndpointListProp
         )}
 
         <div className="space-y-2">
-          {healthData?.map((health) => (
+          {healthData?.map((health: any) => (
             <div
               key={health.endpoint.id}
               className={`p-4 border rounded-lg cursor-pointer transition-colors ${
@@ -201,7 +201,7 @@ const EndpointList = ({ selectedEndpointId, onEndpointSelect }: EndpointListProp
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
-                        setEditingId(health.endpoint.id)
+                        // setEditingId(health.endpoint.id) - Editing functionality not implemented yet
                       }}
                       className="p-1 text-gray-500 hover:text-gray-700"
                     >
@@ -239,7 +239,7 @@ const EndpointList = ({ selectedEndpointId, onEndpointSelect }: EndpointListProp
           ))}
         </div>
         
-        {(!healthData || healthData.length === 0) && (
+        {(!healthData || (healthData && healthData.length === 0)) && (
           <div className="text-center py-8 text-gray-500">
             エンドポイントがありません
           </div>

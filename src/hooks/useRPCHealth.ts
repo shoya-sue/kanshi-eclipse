@@ -30,8 +30,6 @@ export const useRPCHealth = (endpoint: RPCEndpoint) => {
 }
 
 export const useAllRPCHealth = () => {
-  const queryClient = useQueryClient()
-  
   return useQuery<RPCHealthData[]>({
     queryKey: ['allRPCHealth'],
     queryFn: async () => {
@@ -53,7 +51,7 @@ export const useAllRPCHealth = () => {
         return {
           endpoint: {
             ...endpoint,
-            status: health.isHealthy ? 'online' : 'offline',
+            status: health.isHealthy ? 'online' as const : 'offline' as const,
             responseTime: health.responseTime,
             blockHeight: health.blockHeight,
             lastChecked: Date.now(),
@@ -86,13 +84,17 @@ export const useNetworkStats = () => {
         ? onlineEndpoints.reduce((acc, h) => acc + h.endpoint.responseTime, 0) / onlineEndpoints.length
         : 0
       
-      const bestEndpoint = onlineEndpoints.reduce((best, current) => 
-        current.endpoint.responseTime < best.endpoint.responseTime ? current : best
-      )?.endpoint
+      const bestEndpoint = onlineEndpoints.length > 0 
+        ? onlineEndpoints.reduce((best, current) => 
+          current.endpoint.responseTime < best.endpoint.responseTime ? current : best
+        ).endpoint
+        : onlineEndpoints[0]?.endpoint
       
-      const worstEndpoint = onlineEndpoints.reduce((worst, current) => 
-        current.endpoint.responseTime > worst.endpoint.responseTime ? current : worst
-      )?.endpoint
+      const worstEndpoint = onlineEndpoints.length > 0 
+        ? onlineEndpoints.reduce((worst, current) => 
+          current.endpoint.responseTime > worst.endpoint.responseTime ? current : worst
+        ).endpoint
+        : onlineEndpoints[0]?.endpoint
       
       return {
         totalEndpoints,
