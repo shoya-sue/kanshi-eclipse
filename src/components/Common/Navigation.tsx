@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { Activity, Search, Server } from 'lucide-react'
+import { Activity, Search, Server, Wallet, ArrowLeftRight } from 'lucide-react'
 
 const Navigation = () => {
   const location = useLocation()
@@ -22,6 +22,18 @@ const Navigation = () => {
       name: 'RPC状態モニター',
       icon: Server,
       description: 'RPCエンドポイントの健全性を監視',
+    },
+    {
+      path: '/wallet',
+      name: 'ウォレット',
+      icon: Wallet,
+      description: '残高確認とトランザクション送信',
+    },
+    {
+      path: '/dex',
+      name: 'DEX取引',
+      icon: ArrowLeftRight,
+      description: 'トークンの交換と取引',
     },
   ]
 

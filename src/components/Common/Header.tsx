@@ -1,5 +1,9 @@
 import { useNetworkStats } from '../../hooks/useRPCHealth'
 import { formatNumber } from '../../utils/formatters'
+import WalletConnect from '../Wallet/WalletConnect'
+import RealtimeStatus from '../Realtime/RealtimeStatus'
+import RealtimeBlockHeight from '../Realtime/RealtimeBlockHeight'
+import RealtimeGasFees from '../Realtime/RealtimeGasFees'
 
 const Header = () => {
   const { data: networkStats } = useNetworkStats()
@@ -38,9 +42,14 @@ const Header = () => {
               </div>
             )}
             
-            <div className="flex items-center space-x-2">
-              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-              <span className="text-sm text-gray-600">Live</span>
+            <div className="hidden lg:flex items-center space-x-4">
+              <RealtimeBlockHeight />
+              <RealtimeGasFees />
+            </div>
+            
+            <div className="flex items-center space-x-4">
+              <RealtimeStatus />
+              <WalletConnect />
             </div>
           </div>
         </div>
