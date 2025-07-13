@@ -497,7 +497,7 @@ export default {
       blockchain: 'Blockchain',
       wallet: 'Wallet'
     },
-    metrics: {
+    metricTypes: {
       responseTime: 'Response Time',
       latency: 'Latency',
       throughput: 'Throughput',
@@ -521,7 +521,7 @@ export default {
       largestContentfulPaint: 'Largest Contentful Paint',
       firstInputDelay: 'First Input Delay'
     },
-    alerts: {
+    alertTypes: {
       warning: 'Warning',
       critical: 'Critical',
       info: 'Info',
@@ -594,7 +594,6 @@ export default {
     instructions: 'Instructions',
     skipToContent: 'Skip to Main Content',
     mainContent: 'Main Content',
-    navigation: 'Navigation',
     sidebar: 'Sidebar',
     header: 'Header',
     footer: 'Footer',
@@ -894,8 +893,6 @@ export default {
     free: 'free',
     occupied: 'occupied',
     reserved: 'reserved',
-    booked: 'booked',
-    available: 'available',
-    unavailable: 'unavailable'
+    booked: 'booked'
   }
 }

@@ -497,7 +497,7 @@ export default {
       blockchain: 'ブロックチェーン',
       wallet: 'ウォレット'
     },
-    metrics: {
+    metricTypes: {
       responseTime: 'レスポンス時間',
       latency: 'レイテンシ',
       throughput: 'スループット',
@@ -521,7 +521,7 @@ export default {
       largestContentfulPaint: 'Largest Contentful Paint',
       firstInputDelay: 'First Input Delay'
     },
-    alerts: {
+    alertTypes: {
       warning: '警告',
       critical: '重要',
       info: '情報',
@@ -594,7 +594,6 @@ export default {
     instructions: '手順',
     skipToContent: 'メインコンテンツにスキップ',
     mainContent: 'メインコンテンツ',
-    navigation: 'ナビゲーション',
     sidebar: 'サイドバー',
     header: 'ヘッダー',
     footer: 'フッター',
@@ -894,8 +893,6 @@ export default {
     free: '空き',
     occupied: '占有',
     reserved: '予約済み',
-    booked: '予約済み',
-    available: '利用可能',
-    unavailable: '利用不可'
+    booked: '予約済み'
   }
 }

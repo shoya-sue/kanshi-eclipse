@@ -263,4 +263,13 @@
       display: none !important;
     }
   }
+
+  /* Animation Delays for 404 page */
+  .animation-delay-200 {
+    animation-delay: 200ms;
+  }
+  
+  .animation-delay-400 {
+    animation-delay: 400ms;
+  }
 }

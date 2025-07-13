@@ -16,8 +16,24 @@ import Wallet from './pages/Wallet'
 import DEX from './pages/DEX'
 import Settings from './pages/Settings'
 import Performance from './pages/Performance'
+import NotFound from './pages/NotFound'
 
-const queryClient = new QueryClient()
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutes
+      gcTime: 1000 * 60 * 60 * 24, // 24 hours (previously cacheTime)
+      retry: 3,
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: 'always',
+    },
+    mutations: {
+      retry: 2,
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    },
+  },
+})
 
 function App() {
   return (
@@ -47,6 +63,7 @@ function App() {
                       <Route path="/dex" element={<DEX />} />
                       <Route path="/settings" element={<Settings />} />
                       <Route path="/performance" element={<Performance />} />
+                      <Route path="*" element={<NotFound />} />
                     </Routes>
                   </ErrorBoundary>
                 </main>
