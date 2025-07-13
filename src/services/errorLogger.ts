@@ -1,3 +1,5 @@
+import { ErrorContext } from '../types/errorLogger'
+
 export interface ErrorLog {
   id: string
   timestamp: number
@@ -6,7 +8,7 @@ export interface ErrorLog {
     message: string
     stack?: string
   }
-  context?: any
+  context?: ErrorContext
   category: ErrorCategory
   userAgent?: string
   url?: string
@@ -121,7 +123,7 @@ class ErrorLoggerService {
     return ErrorSeverity.LOW
   }
 
-  async logError(error: Error, context?: any): Promise<void> {
+  async logError(error: Error, context?: ErrorContext): Promise<void> {
     try {
       await this.initDB()
       
@@ -312,6 +314,10 @@ class ErrorLoggerService {
       console.error('Failed to export logs:', error)
       return '{}'
     }
+  }
+
+  logInfo(message: string, context?: ErrorContext): void {
+    console.info(message, context)
   }
 }
 
