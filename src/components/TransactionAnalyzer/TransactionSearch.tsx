@@ -150,6 +150,11 @@ const TransactionSearch = ({ onTransactionSelect }: TransactionSearchProps) => {
                     ? 'トランザクション署名を入力...'
                     : 'ウォレットアドレスを入力...'
                 }
+                aria-label={
+                  searchType === 'signature'
+                    ? 'トランザクション署名'
+                    : 'ウォレットアドレス'
+                }
                 className={`w-full px-3 py-2 border rounded-md focus:ring-eclipse-primary focus:border-eclipse-primary ${
                   validationError ? 'border-red-300' : 'border-gray-300'
                 }`}

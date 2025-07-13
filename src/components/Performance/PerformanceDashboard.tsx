@@ -8,7 +8,7 @@ import LoadingSpinner from '../Common/LoadingSpinner'
 
 const PerformanceDashboard: React.FC = () => {
   const { stats, isLoading, error, refreshStats, clearMetrics } = usePerformanceMonitor()
-  const { thresholds, updateThreshold } = usePerformanceThresholds()
+  const { thresholds } = usePerformanceThresholds()
   const { alerts, clearAlerts, dismissAlert } = usePerformanceAlert()
   const [selectedCategory, setSelectedCategory] = useState<PerformanceCategory | 'all'>('all')
 
@@ -100,7 +100,7 @@ const PerformanceDashboard: React.FC = () => {
             <span>更新</span>
           </Button>
           <Button
-            variant="danger"
+            variant="outline"
             onClick={clearMetrics}
             className="flex items-center space-x-2"
           >
@@ -263,13 +263,13 @@ const PerformanceDashboard: React.FC = () => {
           </select>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full" role="table" aria-label="パフォーマンスメトリクス一覧">
             <thead>
               <tr className="border-b border-gray-200 dark:border-gray-700">
-                <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-white">名前</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-white">値</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-white">カテゴリー</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-900 dark:text-white">時刻</th>
+                <th scope="col" className="text-left py-3 px-4 font-medium text-gray-900 dark:text-white">名前</th>
+                <th scope="col" className="text-left py-3 px-4 font-medium text-gray-900 dark:text-white">値</th>
+                <th scope="col" className="text-left py-3 px-4 font-medium text-gray-900 dark:text-white">カテゴリー</th>
+                <th scope="col" className="text-left py-3 px-4 font-medium text-gray-900 dark:text-white">時刻</th>
               </tr>
             </thead>
             <tbody>

@@ -12,7 +12,7 @@ const GasFeeTracker = () => {
         <h1 className="text-2xl font-bold text-gray-900 mb-6">ガス料金トラッカー</h1>
         
         <div className="flex justify-between items-center mb-6">
-          <div className="space-x-2">
+          <div className="space-x-2" role="group" aria-label="時間範囲選択">
             <button
               onClick={() => setTimeRange('24h')}
               className={`px-4 py-2 rounded-lg ${
@@ -20,6 +20,8 @@ const GasFeeTracker = () => {
                   ? 'bg-eclipse-primary text-white' 
                   : 'bg-gray-100 text-gray-700'
               }`}
+              aria-label="24時間のガス料金を表示"
+              aria-pressed={timeRange === '24h'}
             >
               24時間
             </button>
@@ -30,6 +32,8 @@ const GasFeeTracker = () => {
                   ? 'bg-eclipse-primary text-white' 
                   : 'bg-gray-100 text-gray-700'
               }`}
+              aria-label="7日間のガス料金を表示"
+              aria-pressed={timeRange === '7d'}
             >
               7日間
             </button>
@@ -40,6 +44,8 @@ const GasFeeTracker = () => {
                   ? 'bg-eclipse-primary text-white' 
                   : 'bg-gray-100 text-gray-700'
               }`}
+              aria-label="30日間のガス料金を表示"
+              aria-pressed={timeRange === '30d'}
             >
               30日間
             </button>

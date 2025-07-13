@@ -62,6 +62,7 @@ const Navigation = () => {
               <Link
                 key={item.path}
                 to={item.path}
+                aria-current={isActive ? 'page' : undefined}
                 className={`flex items-center space-x-3 px-4 py-4 border-b-2 transition-colors ${
                   isActive
                     ? 'border-eclipse-primary text-eclipse-primary bg-white dark:bg-gray-900'
