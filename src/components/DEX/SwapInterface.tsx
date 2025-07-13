@@ -50,8 +50,8 @@ const SwapInterface = () => {
         asLegacyTransaction: false
       }
 
-      const signature = await swapMutation.mutateAsync(swapRequest)
-      console.log('Swap successful:', signature)
+      await swapMutation.mutateAsync(swapRequest)
+      // Swap successful
       
       // Reset form after successful swap
       resetSwap()
