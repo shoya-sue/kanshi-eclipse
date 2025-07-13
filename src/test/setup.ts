@@ -41,7 +41,7 @@ const mockIDBRequest = {
   result: null,
   transaction: null,
   source: null,
-  readyState: 'pending',
+  readyState: 'pending' as IDBRequestReadyState,
   addEventListener: vi.fn(),
   removeEventListener: vi.fn(),
   dispatchEvent: vi.fn(),
@@ -58,8 +58,13 @@ const mockIDBDatabase = {
   addEventListener: vi.fn(),
   removeEventListener: vi.fn(),
   dispatchEvent: vi.fn(),
-}
+  onabort: null,
+  onclose: null,
+  onerror: null,
+  onversionchange: null,
+} as any
 
+// @ts-ignore
 const mockIDBObjectStore = {
   name: 'test-store',
   keyPath: 'id',
@@ -82,19 +87,30 @@ const mockIDBObjectStore = {
   put: vi.fn(() => mockIDBRequest),
 }
 
+// @ts-ignore
 global.indexedDB = {
   open: vi.fn(() => ({
     ...mockIDBRequest,
     onupgradeneeded: null,
     onblocked: null,
-    result: mockIDBDatabase,
-  })),
-  deleteDatabase: vi.fn(() => mockIDBRequest),
+    result: mockIDBDatabase as IDBDatabase,
+    error: null,
+    source: mockIDBDatabase as any,
+  })) as any,
+  deleteDatabase: vi.fn(() => ({
+    ...mockIDBRequest,
+    onblocked: null,
+    onupgradeneeded: null,
+    error: null,
+    result: null as any,
+    source: null as any,
+  })) as any,
   databases: vi.fn(() => Promise.resolve([])),
   cmp: vi.fn(),
 }
 
 // Mock performance API
+// @ts-ignore
 global.performance = {
   ...global.performance,
   mark: vi.fn(),
@@ -107,15 +123,23 @@ global.performance = {
   navigation: {
     type: 0,
     redirectCount: 0,
+    toJSON: () => ({ type: 0, redirectCount: 0 }),
+    TYPE_NAVIGATE: 0,
+    TYPE_RELOAD: 1,
+    TYPE_BACK_FORWARD: 2,
+    TYPE_RESERVED: 255,
   },
 }
 
 // Mock PerformanceObserver
+// @ts-ignore
 global.PerformanceObserver = vi.fn().mockImplementation(() => ({
   observe: vi.fn(),
   disconnect: vi.fn(),
   takeRecords: vi.fn(() => []),
 }))
+// @ts-ignore
+global.PerformanceObserver.supportedEntryTypes = ['measure', 'navigation']
 
 // Mock localStorage
 const localStorageMock = {
@@ -164,6 +188,7 @@ global.fetch = vi.fn(() =>
 ) as any
 
 // Mock WebSocket
+// @ts-ignore
 global.WebSocket = vi.fn().mockImplementation(() => ({
   close: vi.fn(),
   send: vi.fn(),
@@ -175,8 +200,17 @@ global.WebSocket = vi.fn().mockImplementation(() => ({
   CLOSING: 2,
   CLOSED: 3,
 }))
+// @ts-ignore
+global.WebSocket.CONNECTING = 0
+// @ts-ignore
+global.WebSocket.OPEN = 1
+// @ts-ignore
+global.WebSocket.CLOSING = 2
+// @ts-ignore
+global.WebSocket.CLOSED = 3
 
 // Mock URL
+// @ts-ignore
 global.URL = class URL {
   constructor(url: string) {
     this.href = url
@@ -190,6 +224,8 @@ global.URL = class URL {
   host: string = 'localhost'
   hostname: string = 'localhost'
   port: string = ''
+  static createObjectURL = vi.fn(() => 'blob:mock-url')
+  static revokeObjectURL = vi.fn()
   username: string = ''
   password: string = ''
   searchParams: URLSearchParams = new URLSearchParams()
@@ -202,6 +238,7 @@ global.URL = class URL {
 }
 
 // Mock URLSearchParams
+// @ts-ignore
 global.URLSearchParams = class URLSearchParams {
   private params: Map<string, string> = new Map()
 

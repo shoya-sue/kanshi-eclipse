@@ -190,7 +190,6 @@ describe('Retry Utilities', () => {
 
     it('should use fixed delay (no exponential backoff)', async () => {
       const mockFn = vi.fn(() => Promise.reject(new Error('Connection failed')))
-      const onRetry = vi.fn()
       
       const resultPromise = withWalletRetry(mockFn, 2)
       

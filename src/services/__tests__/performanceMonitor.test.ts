@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { performanceMonitor, PerformanceCategory, ErrorSeverity } from '../performanceMonitor'
+import { performanceMonitor, PerformanceCategory } from '../performanceMonitor'
 
 describe('PerformanceMonitor', () => {
   beforeEach(() => {
@@ -378,13 +378,13 @@ describe('PerformanceMonitor', () => {
       const originalPerformanceObserver = global.PerformanceObserver
       global.PerformanceObserver = vi.fn().mockImplementation(() => {
         throw new Error('PerformanceObserver not supported')
-      })
+      }) as any
 
       // Should not throw when starting monitoring
       expect(() => {
         performanceMonitor.stopMonitoring()
         // Re-start monitoring to trigger observer creation
-        const newMonitor = new (performanceMonitor.constructor as any)()
+        new (performanceMonitor.constructor as any)()
       }).not.toThrow()
       
       // Restore PerformanceObserver

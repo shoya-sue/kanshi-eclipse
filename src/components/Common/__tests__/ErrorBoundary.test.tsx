@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '../../test/testUtils'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen } from '../../../test/testUtils'
+import userEvent from '@testing-library/user-event'
 import ErrorBoundary from '../ErrorBoundary'
 
 // Component that throws an error
@@ -116,7 +117,8 @@ describe('ErrorBoundary', () => {
   })
 
   it('should toggle error details visibility', async () => {
-    const { user } = render(
+    const user = userEvent.setup()
+    render(
       <ErrorBoundary showErrorDetails={true}>
         <ErrorComponent shouldError={true} />
       </ErrorBoundary>
@@ -254,7 +256,7 @@ describe('ErrorBoundary', () => {
   })
 
   it('should log errors to error logger', async () => {
-    const { errorLogger } = await import('../../services/errorLogger')
+    const { errorLogger } = await import('../../../services/errorLogger')
 
     render(
       <ErrorBoundary>
@@ -294,7 +296,8 @@ describe('ErrorBoundary', () => {
   })
 
   it('should handle keyboard navigation', async () => {
-    const { user } = render(
+    const user = userEvent.setup()
+    render(
       <ErrorBoundary showErrorDetails={true}>
         <ErrorComponent shouldError={true} />
       </ErrorBoundary>
