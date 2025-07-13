@@ -9,6 +9,7 @@ import {
   SwapRequest, 
   TradeHistory 
 } from '../types/dex'
+import { WalletAdapter } from '../types/wallet'
 
 export const useDEX = () => {
   const { connection } = useConnection()
@@ -79,10 +80,14 @@ export const useSwapTransaction = () => {
 
   return useMutation({
     mutationFn: async (swapRequest: SwapRequest) => {
+      if (!wallet.signTransaction) {
+        throw new Error('Wallet not connected or does not support signing')
+      }
+      
       const swapResponse = await dexService.getSwapTransaction(swapRequest)
       if (!swapResponse) throw new Error('Failed to get swap transaction')
       
-      const signature = await dexService.executeSwap(swapResponse.swapTransaction, wallet)
+      const signature = await dexService.executeSwap(swapResponse.swapTransaction, wallet as Pick<WalletAdapter, 'signTransaction'>)
       if (!signature) throw new Error('Failed to execute swap')
       
       return signature

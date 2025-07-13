@@ -105,8 +105,8 @@ export const useWebSocketSubscription = <T>(
       id: subscriptionId,
       type,
       params,
-      callback: (newData: T) => {
-        setData(newData)
+      callback: (newData) => {
+        setData(newData as T)
         setLastUpdated(Date.now())
       },
     }

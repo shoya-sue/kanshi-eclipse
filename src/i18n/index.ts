@@ -106,11 +106,11 @@ class I18nManager {
 
   private getTranslation(key: string, language: Language): string | null {
     const keys = key.split('.')
-    let current: any = this.translations[language]
+    let current: unknown = this.translations[language]
     
     for (const k of keys) {
       if (current && typeof current === 'object' && k in current) {
-        current = current[k]
+        current = (current as Record<string, unknown>)[k]
       } else {
         return null
       }
@@ -257,14 +257,14 @@ class I18nManager {
     return { missing, invalid }
   }
 
-  private collectKeys(obj: any, prefix: string, keys: Set<string>): void {
+  private collectKeys(obj: Record<string, unknown>, prefix: string, keys: Set<string>): void {
     Object.keys(obj).forEach(key => {
       const fullKey = prefix ? `${prefix}.${key}` : key
       
       if (typeof obj[key] === 'string') {
         keys.add(fullKey)
-      } else if (typeof obj[key] === 'object') {
-        this.collectKeys(obj[key], fullKey, keys)
+      } else if (typeof obj[key] === 'object' && obj[key] !== null) {
+        this.collectKeys(obj[key] as Record<string, unknown>, fullKey, keys)
       }
     })
   }

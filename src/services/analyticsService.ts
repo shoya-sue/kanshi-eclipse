@@ -1,10 +1,17 @@
+export interface AnalyticsDataPayload {
+  address?: string
+  value?: number
+  amount?: number
+  [key: string]: unknown
+}
+
 export interface AnalyticsData {
   id: string
   timestamp: number
   type: AnalyticsType
   category: AnalyticsCategory
-  data: any
-  metadata?: Record<string, any>
+  data: AnalyticsDataPayload
+  metadata?: Record<string, unknown>
 }
 
 export enum AnalyticsType {
@@ -36,7 +43,7 @@ export interface AnalyticsQuery {
   offset?: number
   aggregation?: AggregationType
   groupBy?: string[]
-  filters?: Record<string, any>
+  filters?: Record<string, unknown>
 }
 
 export enum AggregationType {
@@ -55,7 +62,7 @@ export interface AnalyticsReport {
   description: string
   type: ReportType
   query: AnalyticsQuery
-  data: any[]
+  data: AnalyticsData[]
   charts: ChartConfig[]
   createdAt: Date
   updatedAt: Date
@@ -79,7 +86,7 @@ export interface ChartConfig {
   xAxis: string
   yAxis: string
   series: ChartSeries[]
-  options?: Record<string, any>
+  options?: Record<string, unknown>
 }
 
 export enum ChartType {
@@ -93,9 +100,14 @@ export enum ChartType {
   CANDLESTICK = 'candlestick'
 }
 
+export interface ChartDataPoint {
+  x: string | number | Date | null
+  y: string | number | Date | null
+}
+
 export interface ChartSeries {
   name: string
-  data: Array<{ x: any; y: any }>
+  data: ChartDataPoint[]
   color?: string
   type?: ChartType
 }
@@ -170,8 +182,8 @@ class AnalyticsService {
   async track(
     type: AnalyticsType,
     category: AnalyticsCategory,
-    data: any,
-    metadata?: Record<string, any>
+    data: AnalyticsDataPayload,
+    metadata?: Record<string, unknown>
   ): Promise<void> {
     try {
       await this.initDB()
@@ -265,13 +277,13 @@ class AnalyticsService {
     }
   }
 
-  private matchFilter(item: AnalyticsData, key: string, value: any): boolean {
+  private matchFilter(item: AnalyticsData, key: string, value: unknown): boolean {
     const keys = key.split('.')
-    let current: any = item
+    let current: unknown = item
     
     for (const k of keys) {
       if (current && typeof current === 'object' && k in current) {
-        current = current[k]
+        current = (current as Record<string, unknown>)[k]
       } else {
         return false
       }
@@ -509,7 +521,7 @@ class AnalyticsService {
         const seriesData = data.map(item => ({
           x: this.extractValue(item, config.xAxis),
           y: this.extractValue(item, config.yAxis)
-        })).filter(point => point.x !== null && point.y !== null)
+        }))
         
         return {
           ...seriesConfig,
@@ -524,19 +536,19 @@ class AnalyticsService {
     })
   }
 
-  private extractValue(item: AnalyticsData, path: string): any {
+  private extractValue(item: AnalyticsData, path: string): string | number | Date | null {
     const keys = path.split('.')
-    let current: any = item
+    let current: unknown = item
     
     for (const key of keys) {
       if (current && typeof current === 'object' && key in current) {
-        current = current[key]
+        current = (current as Record<string, unknown>)[key]
       } else {
         return null
       }
     }
     
-    return current
+    return current as string | number | Date | null
   }
 
   private async cleanup(): Promise<void> {

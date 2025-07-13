@@ -1,19 +1,19 @@
 import { ECLIPSE_RPC_CONFIG } from '../utils/constants'
 import { errorLogger } from './errorLogger'
 import { toastService } from './toastService'
-import { withNetworkRetry } from '../utils/retry'
+import { WebSocketMessageData, WebSocketSubscriptionParams } from '../types/websocket'
 
 export interface WebSocketMessage {
   type: string
-  data: any
+  data: WebSocketMessageData
   timestamp: number
 }
 
 export interface WebSocketSubscription {
   id: string
   type: 'blockHeight' | 'gasFees' | 'transactions' | 'rpcHealth'
-  params?: any
-  callback: (data: any) => void
+  params?: WebSocketSubscriptionParams
+  callback: (data: WebSocketMessageData) => void
 }
 
 export class WebSocketService {

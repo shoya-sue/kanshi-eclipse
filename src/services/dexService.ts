@@ -1,4 +1,5 @@
 import { Connection, PublicKey, VersionedTransaction } from '@solana/web3.js'
+import { WalletAdapter } from '../types/wallet'
 import { 
   TokenInfo, 
   Route, 
@@ -118,7 +119,7 @@ export class DexService {
 
   async executeSwap(
     swapTransaction: string,
-    wallet: any
+    wallet: Pick<WalletAdapter, 'signTransaction'>
   ): Promise<string | null> {
     try {
       const swapTransactionBuf = Buffer.from(swapTransaction, 'base64')
@@ -210,7 +211,13 @@ export class DexService {
         
         const prices: TokenPrice[] = []
         for (const [address, data] of Object.entries(priceData.data || {})) {
-          const price = data as any
+          const price = data as { 
+            price?: number
+            mintSymbol?: string
+            vsToken?: string
+            vsTokenSymbol?: string
+            priceChange24h?: number
+          }
           prices.push({
             id: address,
             mintSymbol: price.mintSymbol || '',
@@ -245,7 +252,27 @@ export class DexService {
         }
         const pools = await response.json()
         
-        return pools.map((pool: any) => ({
+        interface RawPool {
+          id: string
+          name?: string
+          tvl?: number
+          volume24h?: number
+          apy?: number
+          ammId?: string
+          baseMint?: string
+          baseSymbol?: string
+          baseName?: string
+          baseDecimals?: number
+          baseLogoURI?: string
+          quoteMint?: string
+          quoteSymbol?: string
+          quoteName?: string
+          quoteDecimals?: number
+          quoteLogoURI?: string
+          liquidity?: number
+          fees24h?: number
+        }
+        return pools.map((pool: RawPool) => ({
           id: pool.ammId,
           tokenA: {
             address: pool.baseMint,

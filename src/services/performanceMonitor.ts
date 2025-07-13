@@ -1,3 +1,5 @@
+import { PerformanceMemoryInfo } from '../types/performance'
+
 export interface PerformanceMetric {
   id: string
   name: string
@@ -187,28 +189,30 @@ class PerformanceMonitorService {
   private monitorMemory(): void {
     const checkMemory = () => {
       if ('memory' in performance) {
-        const memory = (performance as any).memory
+        const memory = (performance as Performance & { memory?: PerformanceMemoryInfo }).memory
         
-        this.recordMetric({
-          name: 'memory_used',
-          value: memory.usedJSHeapSize,
-          unit: 'bytes',
-          category: PerformanceCategory.MEMORY
-        })
-        
-        this.recordMetric({
-          name: 'memory_total',
-          value: memory.totalJSHeapSize,
-          unit: 'bytes',
-          category: PerformanceCategory.MEMORY
-        })
-        
-        this.recordMetric({
-          name: 'memory_limit',
-          value: memory.jsHeapSizeLimit,
-          unit: 'bytes',
-          category: PerformanceCategory.MEMORY
-        })
+        if (memory) {
+          this.recordMetric({
+            name: 'memory_used',
+            value: memory.usedJSHeapSize,
+            unit: 'bytes',
+            category: PerformanceCategory.MEMORY
+          })
+          
+          this.recordMetric({
+            name: 'memory_total',
+            value: memory.totalJSHeapSize,
+            unit: 'bytes',
+            category: PerformanceCategory.MEMORY
+          })
+          
+          this.recordMetric({
+            name: 'memory_limit',
+            value: memory.jsHeapSizeLimit,
+            unit: 'bytes',
+            category: PerformanceCategory.MEMORY
+          })
+        }
       }
     }
     
@@ -222,21 +226,21 @@ class PerformanceMonitorService {
     if (navigation) {
       this.recordMetric({
         name: 'page_load_time',
-        value: navigation.loadEventEnd - navigation.navigationStart,
+        value: navigation.loadEventEnd - navigation.fetchStart,
         unit: 'ms',
         category: PerformanceCategory.NETWORK
       })
       
       this.recordMetric({
         name: 'dom_ready_time',
-        value: navigation.domContentLoadedEventEnd - navigation.navigationStart,
+        value: navigation.domContentLoadedEventEnd - navigation.fetchStart,
         unit: 'ms',
         category: PerformanceCategory.RENDERING
       })
       
       this.recordMetric({
         name: 'first_byte_time',
-        value: navigation.responseStart - navigation.navigationStart,
+        value: navigation.responseStart - navigation.fetchStart,
         unit: 'ms',
         category: PerformanceCategory.NETWORK
       })
@@ -327,7 +331,7 @@ class PerformanceMonitorService {
           if (entry.entryType === 'layout-shift') {
             this.recordMetric({
               name: 'layout_shift',
-              value: (entry as any).value,
+              value: (entry as any).value || 0,
               unit: 'score',
               category: PerformanceCategory.RENDERING
             })

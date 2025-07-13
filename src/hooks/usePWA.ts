@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 
-export interface PWAInstallPrompt {
+export interface PWAInstallPrompt extends Event {
   prompt: () => Promise<void>
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
 }
@@ -30,7 +30,7 @@ export const usePWA = () => {
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault()
-      setInstallPrompt(e as any)
+      setInstallPrompt(e as PWAInstallPrompt)
       setIsInstallable(true)
     }
 
@@ -60,11 +60,11 @@ export const usePWA = () => {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js')
         .then((registration) => {
-          console.log('Service Worker registered:', registration)
+          // Service Worker registered successfully
           setServiceWorkerRegistration(registration)
         })
-        .catch((error) => {
-          console.error('Service Worker registration failed:', error)
+        .catch(() => {
+          // Service Worker registration failed
         })
     }
   }, [])
@@ -92,7 +92,7 @@ export const usePWA = () => {
 
   const requestNotificationPermission = async () => {
     if (!('Notification' in window)) {
-      console.log('This browser does not support notifications')
+      // This browser does not support notifications
       return false
     }
 
@@ -123,7 +123,7 @@ export const usePWA = () => {
     return false
   }
 
-  const sendPushNotification = async (title: string, body: string, data?: any) => {
+  const sendPushNotification = async (title: string, body: string, data?: Record<string, unknown>) => {
     if (!serviceWorkerRegistration) return false
 
     try {

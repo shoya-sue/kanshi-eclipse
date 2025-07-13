@@ -1,4 +1,4 @@
-import { PublicKey } from '@solana/web3.js'
+import { PublicKey, VersionedTransaction } from '@solana/web3.js'
 
 export interface WalletState {
   isConnected: boolean
@@ -45,4 +45,16 @@ export interface SwapTransactionRequest {
   toToken: string
   amount: number
   slippage: number
+}
+
+export interface WalletAdapter {
+  publicKey: PublicKey | null
+  connected: boolean
+  connecting: boolean
+  disconnecting: boolean
+  signTransaction: (transaction: VersionedTransaction) => Promise<VersionedTransaction>
+  signAllTransactions: (transactions: VersionedTransaction[]) => Promise<VersionedTransaction[]>
+  signMessage: (message: Uint8Array) => Promise<Uint8Array>
+  connect: () => Promise<void>
+  disconnect: () => Promise<void>
 }
