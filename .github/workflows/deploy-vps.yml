@@ -1,0 +1,62 @@
+name: Deploy to VPS
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'デプロイ環境'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+      message:
+        description: 'デプロイメッセージ'
+        required: false
+        default: '手動デプロイ'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Build project
+      run: npm run build
+      env:
+        VITE_ECLIPSE_RPC_URL: https://eclipse.helius-rpc.com/
+    
+    - name: Deploy to VPS
+      uses: appleboy/scp-action@v0.1.5
+      with:
+        host: ${{ secrets.VPS_HOST }}
+        username: ${{ secrets.VPS_USERNAME }}
+        key: ${{ secrets.VPS_SSH_KEY }}
+        port: ${{ secrets.VPS_PORT }}
+        source: "dist/*"
+        target: "/var/www/vhosts/kanshi-eclipse.sho43.xyz/"
+        strip_components: 1
+        rm: true
+    
+    - name: Set permissions
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.VPS_HOST }}
+        username: ${{ secrets.VPS_USERNAME }}
+        key: ${{ secrets.VPS_SSH_KEY }}
+        port: ${{ secrets.VPS_PORT }}
+        script: |
+          sudo chown -R www-data:www-data /var/www/vhosts/kanshi-eclipse.sho43.xyz/
+          sudo chmod -R 755 /var/www/vhosts/kanshi-eclipse.sho43.xyz/
