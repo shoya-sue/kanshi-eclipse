@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useGasFeeStats } from '../../hooks/useGasFees'
-import { formatLamports } from '../../utils/formatters'
+import { formatWei } from '../../utils/formatters'
 import { Bell, BellOff, Settings } from 'lucide-react'
 import Card from '../Common/Card'
+import { showToast } from '../../services/toastService'
 import Button from '../Common/Button'
 
 interface AlertSettings {
@@ -16,8 +17,8 @@ const GasFeeAlerts = () => {
   const { data: stats } = useGasFeeStats()
   const [settings, setSettings] = useState<AlertSettings>({
     enabled: false,
-    lowThreshold: 5000,
-    highThreshold: 15000,
+    lowThreshold: 15 * 1_000_000_000, // 15 Gwei
+    highThreshold: 50 * 1_000_000_000, // 50 Gwei
     notificationEnabled: false,
   })
   const [showSettings, setShowSettings] = useState(false)
@@ -37,19 +38,7 @@ const GasFeeAlerts = () => {
     localStorage.setItem('gasFeeAlertSettings', JSON.stringify(settings))
   }, [settings])
 
-  useEffect(() => {
-    if (!settings.enabled || !stats) return
-
-    const currentFee = stats.current
-    
-    if (currentFee <= settings.lowThreshold) {
-      showNotification('ガス料金が低下しました', `現在の料金: ${formatLamports(currentFee)}`)
-    } else if (currentFee >= settings.highThreshold) {
-      showNotification('ガス料金が上昇しました', `現在の料金: ${formatLamports(currentFee)}`)
-    }
-  }, [stats, settings])
-
-  const showNotification = (title: string, body: string) => {
+  const showNotification = useCallback((title: string, body: string) => {
     if (!settings.notificationEnabled) return
     
     if ('Notification' in window && Notification.permission === 'granted') {
@@ -58,8 +47,25 @@ const GasFeeAlerts = () => {
         icon: '/favicon.ico',
         badge: '/favicon.ico',
       })
+    } else {
+      showToast({
+        message: `${title}: ${body}`,
+        type: 'info'
+      })
     }
-  }
+  }, [settings.notificationEnabled])
+
+  useEffect(() => {
+    if (!settings.enabled || !stats) return
+
+    const currentFee = stats.current
+    
+    if (currentFee <= settings.lowThreshold) {
+      showNotification('ガス料金が低下しました', `現在の料金: ${formatWei(currentFee)}`)
+    } else if (currentFee >= settings.highThreshold) {
+      showNotification('ガス料金が上昇しました', `現在の料金: ${formatWei(currentFee)}`)
+    }
+  }, [stats, settings, showNotification])
 
   const requestNotificationPermission = async () => {
     if ('Notification' in window) {
@@ -118,7 +124,7 @@ const GasFeeAlerts = () => {
             </div>
             {stats && (
               <div className="text-sm text-gray-600 mt-1">
-                現在の料金: {formatLamports(stats.current)}
+                現在の料金: {formatWei(stats.current)}
               </div>
             )}
           </div>
@@ -142,7 +148,7 @@ const GasFeeAlerts = () => {
             <div className="space-y-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  低料金しきい値 (lamports)
+                  低料金しきい値 (wei)
                 </label>
                 <input
                   type="number"
@@ -155,7 +161,7 @@ const GasFeeAlerts = () => {
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  高料金しきい値 (lamports)
+                  高料金しきい値 (wei)
                 </label>
                 <input
                   type="number"

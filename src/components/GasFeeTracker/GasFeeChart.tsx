@@ -11,7 +11,7 @@ import {
   ChartOptions,
 } from 'chart.js'
 import { useGasFees } from '../../hooks/useGasFees'
-import { formatLamports, formatTime } from '../../utils/formatters'
+import { formatWei, formatTime } from '../../utils/formatters'
 import { CHART_COLORS } from '../../utils/constants'
 import LoadingSpinner from '../Common/LoadingSpinner'
 import ErrorBoundary from '../Common/ErrorBoundary'
@@ -104,7 +104,7 @@ const GasFeeChart = ({ timeRange }: GasFeeChartProps) => {
         callbacks: {
           label: (context) => {
             const value = context.parsed.y
-            return `ガス料金: ${formatLamports(value)}`
+            return `ガス料金: ${formatWei(value)}`
           },
           title: (context) => {
             const index = context[0].dataIndex
@@ -129,13 +129,13 @@ const GasFeeChart = ({ timeRange }: GasFeeChartProps) => {
         display: true,
         title: {
           display: true,
-          text: 'ガス料金 (lamports)',
+          text: 'ガス料金 (wei)',
         },
         grid: {
           color: 'rgba(0, 0, 0, 0.1)',
         },
         ticks: {
-          callback: (value) => formatLamports(Number(value)),
+          callback: (value) => formatWei(Number(value)),
         },
       },
     },

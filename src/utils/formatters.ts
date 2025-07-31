@@ -6,6 +6,23 @@ export const formatLamports = (lamports: number): string => {
   return `${sol.toFixed(6)} SOL`
 }
 
+export const formatWei = (wei: number): string => {
+  // 1 ETH = 10^18 wei
+  const eth = wei / 1_000_000_000_000_000_000
+  if (eth < 0.000001) {
+    // Show in Gwei (10^9 wei)
+    const gwei = wei / 1_000_000_000
+    if (gwei < 0.001) {
+      return `${wei} wei`
+    }
+    return `${gwei.toFixed(3)} Gwei`
+  }
+  return `${eth.toFixed(6)} ETH`
+}
+
+// For Eclipse chain, we use ETH as gas token
+export const formatGasPrice = formatWei
+
 export const formatNumber = (num: number): string => {
   if (num >= 1_000_000) {
     return `${(num / 1_000_000).toFixed(1)}M`

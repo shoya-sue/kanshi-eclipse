@@ -5,7 +5,7 @@ import { useNetworkStats } from '../../hooks/useRPCHealth'
 import { useWalletBalance } from '../../hooks/useWallet'
 import { useDEXStats } from '../../hooks/useDEX'
 import { useMultipleTokenPrices } from '../../hooks/useDEX'
-import { formatLamports, formatNumber } from '../../utils/formatters'
+import { formatWei, formatNumber } from '../../utils/formatters'
 import { Activity, Server, Wallet, TrendingUp, DollarSign, Settings } from 'lucide-react'
 import Card from '../Common/Card'
 import LoadingSpinner from '../Common/LoadingSpinner'
@@ -88,10 +88,10 @@ const GasFeesWidget = () => {
         <span className="text-sm text-gray-600 dark:text-gray-400">現在のガス料金</span>
       </div>
       <div className="text-2xl font-bold text-gray-900 dark:text-white">
-        {gasFees && gasFees.length > 0 ? formatLamports(gasFees[0].fee) : '---'}
+        {gasFees && gasFees.length > 0 ? formatWei(gasFees[0].fee) : '---'}
       </div>
       <div className="text-sm text-gray-500 dark:text-gray-400">
-        平均: {gasFees && gasFees.length > 0 ? formatLamports(gasFees.reduce((sum, fee) => sum + fee.fee, 0) / gasFees.length) : '---'}
+        平均: {gasFees && gasFees.length > 0 ? formatWei(gasFees.reduce((sum, fee) => sum + fee.fee, 0) / gasFees.length) : '---'}
       </div>
     </div>
   )

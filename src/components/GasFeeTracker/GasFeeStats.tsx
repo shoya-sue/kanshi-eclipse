@@ -1,5 +1,5 @@
 import { useGasFeeStats } from '../../hooks/useGasFees'
-import { formatLamports } from '../../utils/formatters'
+import { formatWei } from '../../utils/formatters'
 import { TrendingUp, TrendingDown, Minus, Zap } from 'lucide-react'
 import LoadingSpinner from '../Common/LoadingSpinner'
 import Card from '../Common/Card'
@@ -54,28 +54,28 @@ const GasFeeStats = () => {
               {getTrendIcon(stats.current, stats.average24h)}
             </div>
             <div className={`text-lg font-bold ${getTrendColor(stats.current, stats.average24h)}`}>
-              {formatLamports(stats.current)}
+              {formatWei(stats.current)}
             </div>
           </div>
           
           <div className="bg-gray-50 p-4 rounded-lg">
             <div className="text-sm font-medium text-gray-600 mb-2">24時間平均</div>
             <div className="text-lg font-bold text-gray-900">
-              {formatLamports(stats.average24h)}
+              {formatWei(stats.average24h)}
             </div>
           </div>
           
           <div className="bg-gray-50 p-4 rounded-lg">
             <div className="text-sm font-medium text-gray-600 mb-2">24時間最小</div>
             <div className="text-lg font-bold text-green-600">
-              {formatLamports(stats.min24h)}
+              {formatWei(stats.min24h)}
             </div>
           </div>
           
           <div className="bg-gray-50 p-4 rounded-lg">
             <div className="text-sm font-medium text-gray-600 mb-2">24時間最大</div>
             <div className="text-lg font-bold text-red-600">
-              {formatLamports(stats.max24h)}
+              {formatWei(stats.max24h)}
             </div>
           </div>
         </div>
@@ -86,19 +86,19 @@ const GasFeeStats = () => {
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-600">低速 (遅い)</span>
               <span className="font-medium text-green-600">
-                {formatLamports(stats.recommended.low)}
+                {formatWei(stats.recommended.low)}
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-600">標準 (普通)</span>
               <span className="font-medium text-eclipse-primary">
-                {formatLamports(stats.recommended.medium)}
+                {formatWei(stats.recommended.medium)}
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-600">高速 (速い)</span>
               <span className="font-medium text-red-600">
-                {formatLamports(stats.recommended.high)}
+                {formatWei(stats.recommended.high)}
               </span>
             </div>
           </div>

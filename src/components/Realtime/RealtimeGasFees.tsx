@@ -1,5 +1,5 @@
 import { useRealtimeGasFees } from '../../hooks/useWebSocket'
-import { formatLamports } from '../../utils/formatters'
+import { formatWei } from '../../utils/formatters'
 import { Zap, TrendingUp, TrendingDown } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
@@ -62,7 +62,7 @@ const RealtimeGasFees = () => {
       <div className="text-sm">
         <span className="text-gray-600">ガス料金: </span>
         <span className={`font-medium ${getTrendColor()}`}>
-          {currentFee ? formatLamports(currentFee) : '---'}
+          {currentFee ? formatWei(currentFee) : '---'}
         </span>
       </div>
       {lastUpdated > 0 && (

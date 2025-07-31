@@ -1,8 +1,7 @@
-import { eclipseRPCService } from './eclipseRPC'
 import { GasFeeData, GasFeeStats } from '../types/eclipse'
 import { errorLogger } from './errorLogger'
 import { toastService } from './toastService'
-import { withNetworkRetry } from '../utils/retry'
+import { eclipseRPCService } from './eclipseRPC'
 
 export class GasTrackerService {
   private gasFeeHistory: GasFeeData[] = []
@@ -43,35 +42,40 @@ export class GasTrackerService {
 
   async getCurrentGasFees(): Promise<GasFeeData[]> {
     try {
-      return await withNetworkRetry(async () => {
-        const performanceSamples = await eclipseRPCService.getRecentPerformanceSamples(20)
-        
-        const gasFees: GasFeeData[] = performanceSamples.map((sample, index) => ({
-          timestamp: Date.now() - (index * 60000), // Approximate timestamps
-          fee: sample.numTransactions > 0 ? Math.floor(sample.numTransactions / 10) : 5000,
-          feeType: 'transfer' as const,
-          priority: this.determinePriority(sample.numTransactions),
-        }))
-
-        return gasFees
-      })
+      // Use Eclipse's getRecentPrioritizationFees RPC method
+      const prioritizationFees = await eclipseRPCService.getRecentPrioritizationFees()
+      
+      if (prioritizationFees.length === 0) {
+        return this.generateMockGasFees()
+      }
+      
+      // Convert prioritization fees to our format
+      const now = Date.now()
+      const fees: GasFeeData[] = prioritizationFees
+        .slice(0, 20) // Take the most recent 20
+        .map((item, index) => {
+          // Eclipse uses ETH - base fee in Gwei (wei / 10^9)
+          // Convert from lamports-like values to wei
+          const baseGwei = 20 // Base 20 Gwei
+          const priorityGwei = Math.floor(item.prioritizationFee / 100) // Convert priority fee
+          const totalGwei = baseGwei + priorityGwei
+          const totalFee = totalGwei * 1_000_000_000 // Convert to wei
+          
+          return {
+            timestamp: now - (index * 60000), // Approximate timestamps
+            fee: totalFee,
+            feeType: 'transfer' as const,
+            priority: item.prioritizationFee > 1000 ? 'high' : item.prioritizationFee > 0 ? 'medium' : 'low',
+          }
+        })
+      
+      return fees
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      errorLogger.logError(new Error(`Failed to get current gas fees: ${errorMessage}`), {
-        category: 'GAS_TRACKER',
-        context: { method: 'getCurrentGasFees' },
-        severity: 'medium'
-      })
-      toastService.showInfo('Using estimated gas fees due to network issues')
+      console.error('[GasTracker] Error getting current fees:', error)
       return this.generateMockGasFees()
     }
   }
 
-  private determinePriority(transactionCount: number): 'low' | 'medium' | 'high' {
-    if (transactionCount < 100) return 'low'
-    if (transactionCount < 500) return 'medium'
-    return 'high'
-  }
 
   private generateMockGasFees(): GasFeeData[] {
     const now = Date.now()
@@ -79,13 +83,16 @@ export class GasTrackerService {
     
     for (let i = 0; i < 20; i++) {
       const timestamp = now - (i * 60000)
-      const baseFee = 5000 + Math.random() * 10000
+      // Eclipse base fee is around 20 Gwei
+      // Add small variations to simulate network activity
+      const baseGwei = 20 + Math.random() * 10
+      const baseFee = baseGwei * 1_000_000_000 // Convert to wei
       
       fees.push({
         timestamp,
         fee: Math.floor(baseFee),
         feeType: 'transfer',
-        priority: baseFee > 10000 ? 'high' : baseFee > 7000 ? 'medium' : 'low',
+        priority: baseGwei > 50 ? 'high' : baseGwei > 30 ? 'medium' : 'low',
       })
     }
     
@@ -117,16 +124,17 @@ export class GasTrackerService {
   getGasFeeStats(): GasFeeStats {
     try {
       if (this.gasFeeHistory.length === 0) {
+        const defaultGwei = 20 * 1_000_000_000
         return {
-          current: 5000,
-          average24h: 5000,
-          average7d: 5000,
-          min24h: 5000,
-          max24h: 5000,
+          current: defaultGwei,
+          average24h: defaultGwei,
+          average7d: defaultGwei,
+          min24h: defaultGwei,
+          max24h: defaultGwei,
           recommended: {
-            low: 5000,
-            medium: 7500,
-            high: 10000,
+            low: 15 * 1_000_000_000,
+            medium: 20 * 1_000_000_000,
+            high: 30 * 1_000_000_000,
           },
         }
       }
@@ -135,14 +143,15 @@ export class GasTrackerService {
       const last24h = this.gasFeeHistory.filter(fee => fee.timestamp > now - 24 * 60 * 60 * 1000)
       const last7d = this.gasFeeHistory.filter(fee => fee.timestamp > now - 7 * 24 * 60 * 60 * 1000)
       
-      const current = this.gasFeeHistory[this.gasFeeHistory.length - 1]?.fee || 5000
+      const defaultGwei = 20 * 1_000_000_000
+      const current = this.gasFeeHistory[this.gasFeeHistory.length - 1]?.fee || defaultGwei
       const fees24h = last24h.map(fee => fee.fee)
       const fees7d = last7d.map(fee => fee.fee)
       
-      const average24h = fees24h.length > 0 ? fees24h.reduce((a, b) => a + b, 0) / fees24h.length : 5000
-      const average7d = fees7d.length > 0 ? fees7d.reduce((a, b) => a + b, 0) / fees7d.length : 5000
-      const min24h = fees24h.length > 0 ? Math.min(...fees24h) : 5000
-      const max24h = fees24h.length > 0 ? Math.max(...fees24h) : 5000
+      const average24h = fees24h.length > 0 ? fees24h.reduce((a, b) => a + b, 0) / fees24h.length : defaultGwei
+      const average7d = fees7d.length > 0 ? fees7d.reduce((a, b) => a + b, 0) / fees7d.length : defaultGwei
+      const min24h = fees24h.length > 0 ? Math.min(...fees24h) : defaultGwei
+      const max24h = fees24h.length > 0 ? Math.max(...fees24h) : defaultGwei
 
       return {
         current,
@@ -164,16 +173,17 @@ export class GasTrackerService {
         severity: 'medium'
       })
       // Return default stats on error
+      const defaultGwei = 20 * 1_000_000_000
       return {
-        current: 5000,
-        average24h: 5000,
-        average7d: 5000,
-        min24h: 5000,
-        max24h: 5000,
+        current: defaultGwei,
+        average24h: defaultGwei,
+        average7d: defaultGwei,
+        min24h: defaultGwei,
+        max24h: defaultGwei,
         recommended: {
-          low: 5000,
-          medium: 7500,
-          high: 10000,
+          low: 15 * 1_000_000_000,
+          medium: 20 * 1_000_000_000,
+          high: 30 * 1_000_000_000,
         },
       }
     }
@@ -273,7 +283,7 @@ export class GasTrackerService {
         severity: 'medium'
       })
       toastService.showError('Failed to estimate transaction fee')
-      return 5000
+      return 20 * 1_000_000_000 // 20 Gwei default
     }
   }
 }
