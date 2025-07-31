@@ -47,6 +47,12 @@ const TransactionSearch = ({ onTransactionSelect }: TransactionSearchProps) => {
     return true
   }, [])
 
+  const addToSearchHistory = useCallback((input: string) => {
+    const newHistory = [input, ...searchHistory.filter(item => item !== input)].slice(0, 10)
+    setSearchHistory(newHistory)
+    localStorage.setItem('transactionSearchHistory', JSON.stringify(newHistory))
+  }, [searchHistory])
+
   const handleSearch = useCallback(async () => {
     if (!validateInput(searchInput, searchType)) return
 
@@ -77,13 +83,7 @@ const TransactionSearch = ({ onTransactionSelect }: TransactionSearchProps) => {
         console.error('Transaction search failed:', error)
       }
     }
-  }, [searchInput, searchType, transaction, onTransactionSelect, transactionSearchMutation, validateInput])
-
-  const addToSearchHistory = (input: string) => {
-    const newHistory = [input, ...searchHistory.filter(item => item !== input)].slice(0, 10)
-    setSearchHistory(newHistory)
-    localStorage.setItem('transactionSearchHistory', JSON.stringify(newHistory))
-  }
+  }, [searchInput, searchType, transaction, onTransactionSelect, transactionSearchMutation, validateInput, addToSearchHistory])
 
   const handleHistoryClick = (historyItem: string) => {
     setSearchInput(historyItem)

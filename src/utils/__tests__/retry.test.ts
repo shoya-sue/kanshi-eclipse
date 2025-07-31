@@ -5,7 +5,10 @@ import {
   withWalletRetry, 
   withBlockchainRetry, 
   RetryError,
-  CircuitBreaker 
+  CircuitBreaker,
+  networkCircuitBreaker,
+  walletCircuitBreaker,
+  blockchainCircuitBreaker
 } from '../retry'
 
 describe('Retry Utilities', () => {
@@ -347,7 +350,8 @@ describe('Retry Utilities', () => {
 
   describe('pre-configured circuit breakers', () => {
     it('should have correct configurations', () => {
-      const { networkCircuitBreaker, walletCircuitBreaker, blockchainCircuitBreaker } = require('../retry')
+      // Circuit breakers should be imported at the top of the file
+      // This test is checking that they are properly exported
       
       expect(networkCircuitBreaker).toBeInstanceOf(CircuitBreaker)
       expect(walletCircuitBreaker).toBeInstanceOf(CircuitBreaker)

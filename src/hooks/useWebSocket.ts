@@ -62,7 +62,8 @@ export const useWebSocket = (options: UseWebSocketOptions = {}) => {
     // Cleanup on unmount
     return () => {
       // Unsubscribe all subscriptions created by this hook
-      subscriptionsRef.current.forEach(id => {
+      const subscriptions = new Set(subscriptionsRef.current)
+      subscriptions.forEach(id => {
         webSocketService.unsubscribe(id)
       })
       subscriptionsRef.current.clear()

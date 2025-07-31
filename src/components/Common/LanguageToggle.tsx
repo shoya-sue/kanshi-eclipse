@@ -1,6 +1,6 @@
 import React from 'react'
 import { Languages } from 'lucide-react'
-import { useI18n } from '../../contexts/I18nContext'
+import { useI18n } from '../../contexts/useI18n'
 
 const LanguageToggle: React.FC = () => {
   const { language, setLanguage, availableLanguages } = useI18n()

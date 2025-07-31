@@ -15,9 +15,9 @@ interface WalletContextProviderProps {
 }
 
 export const WalletContextProvider: React.FC<WalletContextProviderProps> = ({ children }) => {
-  // Use Eclipse mainnet endpoint instead of Solana
+  // Use Helius Eclipse RPC endpoint
   const endpoint = useMemo(() => {
-    return process.env.VITE_ECLIPSE_RPC_URL || 'https://mainnetbeta-rpc.eclipse.xyz'
+    return import.meta.env.VITE_ECLIPSE_RPC_URL || 'https://eclipse.helius-rpc.com/'
   }, [])
 
   const wallets = useMemo(() => [

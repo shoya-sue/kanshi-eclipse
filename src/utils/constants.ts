@@ -1,12 +1,14 @@
 export const ECLIPSE_RPC_CONFIG = {
   MAINNET: {
-    url: import.meta.env.VITE_ECLIPSE_RPC_URL || 'https://mainnetbeta-rpc.eclipse.xyz',
-    websocketUrl: import.meta.env.VITE_ECLIPSE_WS_URL || 'wss://mainnetbeta-rpc.eclipse.xyz',
+    url: import.meta.env.VITE_ECLIPSE_RPC_URL || 'https://eclipse.helius-rpc.com/',
+    websocketUrl: import.meta.env.VITE_ECLIPSE_WS_URL || 'wss://eclipse.helius-rpc.com/',
   },
   BACKUP_URLS: (import.meta.env.VITE_BACKUP_RPC_URLS || '').split(',').filter(Boolean),
   TIMEOUT: 5000,
   RETRY_COUNT: 3,
 }
+
+export const ECLIPSE_SYSTEM_PROGRAM_ID = '11111111111111111111111111111111'
 
 export const UPDATE_INTERVALS = {
   GAS_FEE: parseInt(import.meta.env.VITE_GAS_FEE_UPDATE_INTERVAL || '15000'),
@@ -31,15 +33,15 @@ export const GAS_FEE_LEVELS = {
 
 export const DEFAULT_RPC_ENDPOINTS = [
   {
-    id: 'mainnet-1',
-    name: 'Eclipse Mainnet',
-    url: 'https://mainnetbeta-rpc.eclipse.xyz',
+    id: 'helius-1',
+    name: 'Helius Eclipse RPC',
+    url: 'https://eclipse.helius-rpc.com/',
     isActive: true,
   },
   {
-    id: 'mainnet-2',
-    name: 'Eclipse Mainnet (Backup)',
-    url: 'https://rpc.eclipse.xyz',
+    id: 'mainnet-1',
+    name: 'Eclipse Mainnet',
+    url: 'https://mainnetbeta-rpc.eclipse.xyz',
     isActive: false,
   },
 ]

@@ -105,10 +105,11 @@ export class TransactionDecoderService {
 
   private decodeSystemProgramInstruction(data: string): any {
     try {
-      const buffer = Buffer.from(data, 'base64')
-      if (buffer.length === 0) return { type: 'unknown' }
+      const bytes = Uint8Array.from(atob(data), c => c.charCodeAt(0))
+      if (bytes.length === 0) return { type: 'unknown' }
       
-      const instruction = buffer.readUInt32LE(0)
+      const dataView = new DataView(bytes.buffer)
+      const instruction = dataView.getUint32(0, true) // true for little-endian
       
       switch (instruction) {
         case 0:
@@ -116,7 +117,7 @@ export class TransactionDecoderService {
         case 1:
           return { type: 'Assign' }
         case 2:
-          return { type: 'Transfer', amount: buffer.length >= 12 ? buffer.readBigUInt64LE(4) : 0 }
+          return { type: 'Transfer', amount: bytes.length >= 12 ? dataView.getBigUint64(4, true) : 0 }
         case 3:
           return { type: 'CreateAccountWithSeed' }
         case 4:
@@ -151,10 +152,10 @@ export class TransactionDecoderService {
 
   private decodeTokenProgramInstruction(data: string): any {
     try {
-      const buffer = Buffer.from(data, 'base64')
-      if (buffer.length === 0) return { type: 'unknown' }
+      const bytes = Uint8Array.from(atob(data), c => c.charCodeAt(0))
+      if (bytes.length === 0) return { type: 'unknown' }
       
-      const instruction = buffer.readUInt8(0)
+      const instruction = bytes[0]
       
       switch (instruction) {
         case 0:
@@ -164,7 +165,7 @@ export class TransactionDecoderService {
         case 2:
           return { type: 'InitializeMultisig' }
         case 3:
-          return { type: 'Transfer', amount: buffer.length >= 9 ? buffer.readBigUInt64LE(1) : 0 }
+          return { type: 'Transfer', amount: bytes.length >= 9 ? new DataView(bytes.buffer).getBigUint64(1, true) : 0 }
         case 4:
           return { type: 'Approve' }
         case 5:

@@ -347,5 +347,5 @@ export const useAccessibleModal = (
         doRestoreFocus()
       }
     }
-  }, [modalRef, onClose, restoreFocus])
+  }, [modalRef, onClose, restoreFocus, announce, doRestoreFocus, saveFocus])
 }

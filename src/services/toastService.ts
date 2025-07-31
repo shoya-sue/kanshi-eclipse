@@ -166,3 +166,25 @@ class ToastService {
 }
 
 export const toastService = new ToastService()
+
+// Helper function for showing toast messages
+export const showToast = (options: {
+  message: string
+  type: 'success' | 'error' | 'warning' | 'info'
+  options?: ToastOptions
+}) => {
+  switch (options.type) {
+    case 'success':
+      toastService.showSuccess(options.message, options.options)
+      break
+    case 'error':
+      toastService.showError(options.message, options.options)
+      break
+    case 'warning':
+      toastService.showWarning(options.message, options.options)
+      break
+    case 'info':
+      toastService.showInfo(options.message, options.options)
+      break
+  }
+}

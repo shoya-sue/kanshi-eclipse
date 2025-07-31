@@ -130,7 +130,7 @@ export const useCachedData = <T>(
     }
 
     fetchData()
-  }, [isReady, store, key, ttl])
+  }, [isReady, store, key, ttl, fetcher, getCache, setCache])
 
   const refresh = async () => {
     try {

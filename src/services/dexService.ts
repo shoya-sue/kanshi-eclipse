@@ -122,7 +122,7 @@ export class DexService {
     wallet: Pick<WalletAdapter, 'signTransaction'>
   ): Promise<string | null> {
     try {
-      const swapTransactionBuf = Buffer.from(swapTransaction, 'base64')
+      const swapTransactionBuf = Uint8Array.from(atob(swapTransaction), c => c.charCodeAt(0))
       const transaction = VersionedTransaction.deserialize(swapTransactionBuf)
       
       const signedTransaction = await withWalletRetry(async () => {

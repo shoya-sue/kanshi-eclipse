@@ -6,7 +6,7 @@ import { ThemeProvider } from '../contexts/ThemeContext'
 import { WalletContextProvider } from '../contexts/WalletContext'
 import { vi } from 'vitest'
 
-// Create a custom render function that includes providers
+// Test utilities and custom render functions
 const AllTheProviders = ({ children }: { children: React.ReactNode }) => {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -232,6 +232,7 @@ export const mockServices = {
 }
 
 // Re-export everything
+// Re-export testing library utilities
 export * from '@testing-library/react'
 export { default as userEvent } from '@testing-library/user-event'
 export { customRender as render }

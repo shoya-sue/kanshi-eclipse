@@ -3,7 +3,7 @@ import { EclipseRPCConfig } from '../types/eclipse'
 import { ECLIPSE_RPC_CONFIG } from '../utils/constants'
 import { errorLogger } from './errorLogger'
 import { toastService } from './toastService'
-import { withBlockchainRetry, withNetworkRetry } from '../utils/retry'
+import { withBlockchainRetry } from '../utils/retry'
 
 export class EclipseRPCService {
   private connection: Connection
@@ -47,10 +47,13 @@ export class EclipseRPCService {
   async getBlockHeight(): Promise<number> {
     try {
       return await withBlockchainRetry(async () => {
-        return await this.connection.getBlockHeight()
+        const result = await this.connection.getBlockHeight()
+        console.log('[EclipseRPC] Block height:', result)
+        return result
       })
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      console.error('[EclipseRPC] Failed to get block height:', error)
       errorLogger.logError(new Error(`Failed to get block height: ${errorMessage}`), {
         category: 'RPC',
         context: { method: 'getBlockHeight', endpoint: this.config.url },
@@ -150,15 +153,9 @@ export class EclipseRPCService {
 
   async getHealth() {
     try {
-      return await withNetworkRetry(async () => {
-        const response = await fetch(`${this.config.url}/health`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        })
-        return response.ok ? 'ok' : 'error'
-      })
+      // Eclipse RPC doesn't have a /health endpoint, so we'll use getVersion as a health check
+      const version = await this.getVersion()
+      return version ? 'ok' : 'error'
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       errorLogger.logError(new Error(`Failed to get health: ${errorMessage}`), {
@@ -281,6 +278,38 @@ export class EclipseRPCService {
       })
       toastService.showError('Failed to fetch transaction signatures')
       throw error
+    }
+  }
+
+  async getRecentPrioritizationFees(addresses?: string[]): Promise<Array<{slot: number, prioritizationFee: number}>> {
+    try {
+      return await withBlockchainRetry(async () => {
+        const response = await fetch(this.config.url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'getRecentPrioritizationFees',
+            params: addresses ? [addresses] : [],
+          }),
+        })
+        
+        const data = await response.json()
+        console.log('[EclipseRPC] Prioritization fees:', data.result)
+        return data.result || []
+      })
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      console.error('[EclipseRPC] Failed to get prioritization fees:', error)
+      errorLogger.logError(new Error(`Failed to get prioritization fees: ${errorMessage}`), {
+        category: 'RPC',
+        context: { method: 'getRecentPrioritizationFees', endpoint: this.config.url },
+        severity: 'medium'
+      })
+      return []
     }
   }
 

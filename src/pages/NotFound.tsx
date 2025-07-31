@@ -2,7 +2,7 @@ import React from 'react'
 import { Link } from 'react-router-dom'
 import { Home, ArrowLeft } from 'lucide-react'
 import Button from '../components/Common/Button'
-import { useI18n } from '../contexts/I18nContext'
+import { useI18n } from '../contexts/useI18n'
 
 const NotFound: React.FC = () => {
   const { language } = useI18n()

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import React, { createContext, useState, useEffect, ReactNode } from 'react'
 import { i18n, Language } from '../i18n'
 
 interface I18nContextType {
@@ -15,15 +15,7 @@ interface I18nContextType {
   direction: 'ltr' | 'rtl'
 }
 
-const I18nContext = createContext<I18nContextType | undefined>(undefined)
-
-export const useI18n = () => {
-  const context = useContext(I18nContext)
-  if (!context) {
-    throw new Error('useI18n must be used within an I18nProvider')
-  }
-  return context
-}
+export const I18nContext = createContext<I18nContextType | undefined>(undefined)
 
 interface I18nProviderProps {
   children: ReactNode
