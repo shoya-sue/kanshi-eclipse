@@ -108,7 +108,7 @@ jobs:
         name: build-artifact
     
     - name: Deploy to VPS
-      uses: appleboy/ssh-action@v1.0.0
+      uses: appleboy/ssh-action@v1.2.2
       with:
         host: ${{ secrets.VPS_HOST }}
         username: ${{ secrets.VPS_USERNAME }}
@@ -138,7 +138,7 @@ jobs:
         target: "/tmp/"
     
     - name: Extract and set permissions
-      uses: appleboy/ssh-action@v1.0.0
+      uses: appleboy/ssh-action@v1.2.2
       with:
         host: ${{ secrets.VPS_HOST }}
         username: ${{ secrets.VPS_USERNAME }}
