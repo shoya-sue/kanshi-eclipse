@@ -39,7 +39,7 @@ jobs:
         VITE_ECLIPSE_RPC_URL: https://eclipse.helius-rpc.com/
     
     - name: Deploy to VPS
-      uses: appleboy/scp-action@v0.1.5
+      uses: appleboy/scp-action@v1.0.0
       with:
         host: ${{ secrets.VPS_HOST }}
         username: ${{ secrets.VPS_USERNAME }}
